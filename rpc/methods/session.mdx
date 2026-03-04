@@ -328,3 +328,144 @@ Interrupt an active session turn. The assistant will stop processing and emit a 
   }
 }
 ```
+---
+
+## session.queue.list
+
+List queued prompts for a session.
+
+### Request
+
+<ParamField path="session_id" type="string" required>
+  Session ID
+</ParamField>
+
+```json
+{"jsonrpc":"2.0","id":6,"method":"session.queue.list","params":{"session_id":"ses_abc123"}}
+```
+
+### Response
+
+<ResponseField name="queue" type="array" required>
+  Array of queued prompt objects
+</ResponseField>
+
+```json
+{"jsonrpc":"2.0","id":6,"result":{"queue":[{"text":"Write a function","queued_at":"2026-01-01T00:00:00.000Z"}]}}
+```
+
+---
+
+## session.queue.clear
+
+Clear all queued prompts for a session.
+
+### Request
+
+<ParamField path="session_id" type="string" required>
+  Session ID
+</ParamField>
+
+```json
+{"jsonrpc":"2.0","id":7,"method":"session.queue.clear","params":{"session_id":"ses_abc123"}}
+```
+
+### Response
+
+```json
+{"jsonrpc":"2.0","id":7,"result":{"ok":true,"cleared":2}}
+```
+
+---
+
+## history.list
+
+List saved chat sessions.
+
+### Request
+
+<ParamField path="limit" type="number">
+  Maximum number of sessions to return (default: 50)
+</ParamField>
+
+<ParamField path="cursor" type="number">
+  Pagination cursor (session index to start from)
+</ParamField>
+
+```json
+{"jsonrpc":"2.0","id":8,"method":"history.list","params":{"limit":10}}
+```
+
+### Response
+
+<ResponseField name="sessions" type="array" required>
+  Array of session summaries with `id`, `title`, `created_at`, `updated_at`, and `message_count`
+</ResponseField>
+
+```json
+{"jsonrpc":"2.0","id":8,"result":{"sessions":[{"id":"550e8400-e29b-41d4-a716-446655440000","title":"Building a React app","created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-01-01T01:00:00.000Z","message_count":12}]}}
+```
+
+---
+
+## history.get
+
+Load a saved chat session.
+
+### Request
+
+<ParamField path="id" type="string">
+  Session ID to load
+</ParamField>
+
+<ParamField path="last" type="boolean" default={false}>
+  If `true`, load the most recent session
+</ParamField>
+
+<ParamField path="rollout_path" type="string">
+  Optional path to a specific JSONL session file
+</ParamField>
+
+```json
+{"jsonrpc":"2.0","id":9,"method":"history.get","params":{"id":"550e8400-e29b-41d4-a716-446655440000"}}
+```
+
+### Response
+
+<ResponseField name="session" type="object" required>
+  Complete session object with `id`, `title`, `messages`, and metadata
+</ResponseField>
+
+```json
+{"jsonrpc":"2.0","id":9,"result":{"session":{"id":"550e8400-e29b-41d4-a716-446655440000","title":"Building a React app","messages":[{"role":"user","content":"How do I create a React component?"}]}}}
+```
+
+---
+
+## history.clear_session
+
+Clear conversation history for a specific session.
+
+### Request
+
+<ParamField path="session_id" type="string" required>
+  Session ID to clear
+</ParamField>
+
+```json
+{"jsonrpc":"2.0","id":10,"method":"history.clear_session","params":{"session_id":"ses_abc123"}}
+```
+
+### Response
+
+```json
+{"jsonrpc":"2.0","id":10,"result":{"ok":true}}
+```
+
+---
+
+## Related
+
+- [Session events](/rpc/events/session-events) - Real-time session updates
+- [RPC overview](/rpc/overview) - Protocol fundamentals
+- [System methods](/rpc/methods/system) - System operations

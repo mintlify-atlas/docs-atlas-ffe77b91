@@ -193,3 +193,155 @@ No parameters required.
   }
 }
 ```
+
+---
+
+## onboarding.status
+
+Get the current onboarding status.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":4,"method":"onboarding.status","params":{}}
+```
+
+### Response
+
+<ResponseField name="completed" type="boolean" required>
+  Whether the onboarding flow has been completed
+</ResponseField>
+
+<ResponseField name="has_auth" type="boolean" required>
+  Whether at least one provider is authenticated
+</ResponseField>
+
+```json
+{"jsonrpc":"2.0","id":4,"result":{"completed":true,"has_auth":true}}
+```
+
+---
+
+## onboarding.complete
+
+Mark the onboarding flow as complete.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":5,"method":"onboarding.complete","params":{}}
+```
+
+### Response
+
+```json
+{"jsonrpc":"2.0","id":5,"result":{"ok":true}}
+```
+
+---
+
+## command.execute
+
+Execute a slash command in a session context.
+
+### Request
+
+<ParamField path="session_id" type="string" required>
+  Session ID to execute the command in
+</ParamField>
+
+<ParamField path="raw_command" type="string" required>
+  Raw command string (e.g., `/model`, `/skills`, `/clear`)
+</ParamField>
+
+```json
+{"jsonrpc":"2.0","id":6,"method":"command.execute","params":{"session_id":"ses_abc123","raw_command":"/clear"}}
+```
+
+### Response
+
+<ResponseField name="ok" type="boolean" required>
+  Whether the command executed successfully
+</ResponseField>
+
+<ResponseField name="output" type="string">
+  Command output (if any)
+</ResponseField>
+
+```json
+{"jsonrpc":"2.0","id":6,"result":{"ok":true,"output":"Conversation cleared"}}
+```
+
+---
+
+## skills.list
+
+List all discovered skills.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":7,"method":"skills.list","params":{}}
+```
+
+### Response
+
+<ResponseField name="skills" type="array" required>
+  Array of skill objects with `name`, `path`, and `description` fields
+</ResponseField>
+
+```json
+{"jsonrpc":"2.0","id":7,"result":{"skills":[{"name":"frontend-design","path":"/path/to/.agents/skills/frontend-design/SKILL.md","description":"Design and implement frontend components"}]}}
+```
+
+---
+
+## tools.list
+
+List all registered tools (built-in and custom).
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":8,"method":"tools.list","params":{}}
+```
+
+### Response
+
+<ResponseField name="tools" type="array" required>
+  Array of tool names
+</ResponseField>
+
+```json
+{"jsonrpc":"2.0","id":8,"result":{"tools":["bash","read_file","list_dir","grep_files","apply_patch","run_js","search_web","create_persistent_tool"]}}
+```
+
+---
+
+## debug.set
+
+Enable or disable super debug mode.
+
+### Request
+
+<ParamField path="super_debug" type="boolean" required>
+  Whether to enable super debug mode
+</ParamField>
+
+```json
+{"jsonrpc":"2.0","id":9,"method":"debug.set","params":{"super_debug":true}}
+```
+
+### Response
+
+```json
+{"jsonrpc":"2.0","id":9,"result":{"ok":true}}
+```
+
+---
+
+## Related
+
+- [RPC overview](/rpc/overview) - Protocol fundamentals
+- [Session methods](/rpc/methods/session) - Managing sessions
+- [Auth methods](/rpc/methods/auth) - Authentication
