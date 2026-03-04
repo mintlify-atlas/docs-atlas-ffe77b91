@@ -1,0 +1,330 @@
+---
+title: "Session Methods"
+description: "Create, manage, and interact with conversation sessions"
+---
+
+## session.create
+
+Create a new conversation session.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"session.create","params":{"title":"My Conversation"}}
+```
+
+### Parameters
+
+<ParamField path="title" type="string">
+  Optional title for the session
+</ParamField>
+
+### Response
+
+<ResponseField name="session_id" type="string" required>
+  Unique session identifier (UUID)
+</ResponseField>
+
+<ResponseField name="state" type="object" required>
+  Full session state object (see `session.get` for structure)
+</ResponseField>
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "state": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z",
+      "pending": false,
+      "statusLabel": "ready",
+      "messages": [],
+      "history": [],
+      "queue": [],
+      "pendingSteerCount": 0,
+      "conversationProvider": null,
+      "activeSessionId": null,
+      "contextTokenEstimate": 0,
+      "contextTokenSource": "none",
+      "contextTokenProvider": null,
+      "contextTokenBreakdown": {}
+    }
+  }
+}
+```
+
+---
+
+## session.get
+
+Retrieve the current state of a session.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"session.get","params":{"session_id":"550e8400-e29b-41d4-a716-446655440000"}}
+```
+
+### Parameters
+
+<ParamField path="session_id" type="string" required>
+  The session ID to retrieve
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="string" required>
+  Session ID
+</ResponseField>
+
+<ResponseField name="createdAt" type="string" required>
+  ISO 8601 timestamp of creation
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string" required>
+  ISO 8601 timestamp of last update
+</ResponseField>
+
+<ResponseField name="pending" type="boolean" required>
+  Whether the session is currently processing
+</ResponseField>
+
+<ResponseField name="statusLabel" type="string" required>
+  Human-readable status: `"ready"`, `"thinking..."`, `"interrupting..."`, etc.
+</ResponseField>
+
+<ResponseField name="messages" type="array" required>
+  Array of conversation messages
+</ResponseField>
+
+<ResponseField name="history" type="array" required>
+  Full conversation history (internal format)
+</ResponseField>
+
+<ResponseField name="queue" type="array" required>
+  Queued prompts waiting to be processed
+</ResponseField>
+
+<ResponseField name="pendingSteerCount" type="number" required>
+  Number of pending steering interventions
+</ResponseField>
+
+<ResponseField name="conversationProvider" type="string">
+  The provider used for this conversation: `"openai"`, `"openrouter"`, or `"antigravity"`
+</ResponseField>
+
+<ResponseField name="activeSessionId" type="string">
+  Active Claude session ID (if any)
+</ResponseField>
+
+<ResponseField name="contextTokenEstimate" type="number" required>
+  Estimated token count for current context
+</ResponseField>
+
+<ResponseField name="contextTokenSource" type="string" required>
+  Source of token estimate
+</ResponseField>
+
+<ResponseField name="contextTokenProvider" type="string">
+  Provider used for token estimation
+</ResponseField>
+
+<ResponseField name="contextTokenBreakdown" type="object" required>
+  Detailed breakdown of token usage
+</ResponseField>
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:05.000Z",
+    "pending": false,
+    "statusLabel": "ready",
+    "messages": [
+      {"role": "user", "content": "Hello"},
+      {"role": "assistant", "content": "Hi there!"}
+    ],
+    "history": [],
+    "queue": [],
+    "pendingSteerCount": 0,
+    "conversationProvider": "openai",
+    "activeSessionId": null,
+    "contextTokenEstimate": 245,
+    "contextTokenSource": "estimate",
+    "contextTokenProvider": "openai",
+    "contextTokenBreakdown": {}
+  }
+}
+```
+
+---
+
+## session.send
+
+Send a user prompt to a session. The session will process the prompt asynchronously and emit events.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":3,"method":"session.send","params":{"session_id":"550e8400-e29b-41d4-a716-446655440000","text":"Write a hello world program"}}
+```
+
+### Parameters
+
+<ParamField path="session_id" type="string" required>
+  The session ID to send the prompt to
+</ParamField>
+
+<ParamField path="text" type="string">
+  The user prompt text (required unless images are provided)
+</ParamField>
+
+<ParamField path="images" type="array">
+  Array of image inputs (paths or data URLs)
+</ParamField>
+
+<ParamField path="enqueue" type="boolean" default={false}>
+  If `true`, queue the prompt if session is busy. If `false` (default), return error if busy.
+</ParamField>
+
+### Response
+
+<ResponseField name="session_id" type="string" required>
+  The session ID
+</ResponseField>
+
+<ResponseField name="turn_id" type="string" required>
+  Unique turn identifier (UUID)
+</ResponseField>
+
+<ResponseField name="accepted" type="boolean" required>
+  Whether the prompt was accepted
+</ResponseField>
+
+<ResponseField name="queued" type="boolean" required>
+  Whether the prompt was queued (vs. started immediately)
+</ResponseField>
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "turn_id": "660e8400-e29b-41d4-a716-446655440001",
+    "accepted": true,
+    "queued": false
+  }
+}
+```
+
+<Note>
+After sending a prompt, listen for `event` notifications to track progress:
+- `session.status` - Status updates
+- `session.stream.chunk` - Streaming response chunks
+- `session.tool.call.started` - Tool calls
+- `session.completed` - Turn completed
+- `session.error` - Error occurred
+</Note>
+
+---
+
+## session.steer
+
+Inject a steering message during an active turn to guide the assistant's behavior.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":4,"method":"session.steer","params":{"session_id":"550e8400-e29b-41d4-a716-446655440000","text":"Make it more concise"}}
+```
+
+### Parameters
+
+<ParamField path="session_id" type="string" required>
+  The session ID to steer
+</ParamField>
+
+<ParamField path="text" type="string" required>
+  Steering instruction text (must be non-empty)
+</ParamField>
+
+### Response
+
+<ResponseField name="session_id" type="string" required>
+  The session ID
+</ResponseField>
+
+<ResponseField name="accepted" type="boolean" required>
+  Whether the steering was accepted (only works during active turns)
+</ResponseField>
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "result": {
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "accepted": true
+  }
+}
+```
+
+<Warning>
+Steering only works when a session is actively processing (pending=true). If the session is not busy, `accepted` will be `false`.
+</Warning>
+
+---
+
+## session.interrupt
+
+Interrupt an active session turn. The assistant will stop processing and emit a `session.interrupted` event.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":5,"method":"session.interrupt","params":{"session_id":"550e8400-e29b-41d4-a716-446655440000"}}
+```
+
+### Parameters
+
+<ParamField path="session_id" type="string" required>
+  The session ID to interrupt
+</ParamField>
+
+### Response
+
+<ResponseField name="session_id" type="string" required>
+  The session ID
+</ResponseField>
+
+<ResponseField name="interrupted" type="boolean" required>
+  Whether an active turn was interrupted. Returns `false` if no turn was active.
+</ResponseField>
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "interrupted": true
+  }
+}
+```

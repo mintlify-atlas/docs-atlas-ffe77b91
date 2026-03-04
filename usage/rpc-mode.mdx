@@ -1,0 +1,666 @@
+---
+title: RPC Mode
+description: Run loaf as a JSON-RPC server over stdio transport
+---
+
+loaf can run as a JSON-RPC 2.0 server using stdio (standard input/output) as the transport layer. This allows other programs to control loaf programmatically.
+
+## Starting RPC Mode
+
+### npm Script
+
+```bash
+npm run rpc
+```
+
+### CLI Command
+
+```bash
+loaf rpc
+```
+
+### Direct Invocation
+
+```bash
+tsx src/cli.ts rpc
+node --loader tsx src/cli.ts rpc
+```
+
+From `package.json:9` and `src/cli.ts:20-22`
+
+## Protocol
+
+loaf implements **JSON-RPC 2.0** over stdio:
+
+- **Requests:** Sent to `stdin` (one JSON object per line)
+- **Responses:** Written to `stdout` (one JSON object per line)
+- **Events:** Notifications sent to `stdout`
+
+### Request Format
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "session.send",
+  "params": {
+    "session_id": "abc123",
+    "text": "Hello, loaf!"
+  }
+}
+```
+
+### Response Format
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "session_id": "abc123",
+    "accepted": true
+  }
+}
+```
+
+### Error Response
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32602,
+    "message": "invalid params: text is required",
+    "data": {
+      "reason": "invalid_params"
+    }
+  }
+}
+```
+
+### Event Notification
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "session.stream.chunk",
+  "params": {
+    "session_id": "abc123",
+    "chunk": {
+      "answerText": "Hello! How can I"
+    }
+  }
+}
+```
+
+<Note>
+Notifications do not have an `id` field and do not expect a response.
+</Note>
+
+## Error Codes
+
+loaf uses standard JSON-RPC error codes:
+
+| Code    | Name              | Description |
+|---------|-------------------|-------------|
+| -32700  | Parse Error       | Invalid JSON received |
+| -32600  | Invalid Request   | Not a valid JSON-RPC request |
+| -32601  | Method Not Found  | Method does not exist |
+| -32602  | Invalid Params    | Invalid method parameters |
+| -32603  | Internal Error    | Server-side error |
+| -32000  | Server Error      | Application-specific error |
+
+From `src/rpc/protocol.ts:31-38`
+
+## Core Methods
+
+### rpc.handshake
+
+Initialize the RPC connection.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "rpc.handshake",
+  "params": {
+    "client_name": "my_client",
+    "client_version": "1.0.0",
+    "protocol_version": "1.0.0"
+  }
+}
+```
+
+### session.create
+
+Create a new chat session.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "session.create",
+  "params": {
+    "title": "My Session"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "session_id": "abc123-def456",
+    "state": {
+      "pending": false,
+      "statusLabel": "ready",
+      "messages": [],
+      "history": [],
+      "conversationProvider": null,
+      "contextTokenEstimate": 0,
+      "contextTokenSource": "history",
+      "contextTokenBreakdown": {
+        "pinned_tokens": 0,
+        "conversation_tokens": 0,
+        "tool_schema_tokens": 0,
+        "provider_overhead_tokens": 0
+      }
+    }
+  }
+}
+```
+
+### session.send
+
+Send a message to the model.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "session.send",
+  "params": {
+    "session_id": "abc123",
+    "text": "Write a hello world function",
+    "images": [
+      {
+        "path": "/path/to/screenshot.png"
+      }
+    ]
+  }
+}
+```
+
+**With data URL:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "session.send",
+  "params": {
+    "session_id": "abc123",
+    "text": "What's in this image?",
+    "images": [
+      {
+        "data_url": "data:image/png;base64,iVBORw0KGgo...",
+        "mime_type": "image/png"
+      }
+    ]
+  }
+}
+```
+
+### session.get
+
+Get the current session state.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "session.get",
+  "params": {
+    "session_id": "abc123"
+  }
+}
+```
+
+### session.interrupt
+
+Interrupt an active inference.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "session.interrupt",
+  "params": {
+    "session_id": "abc123"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "interrupted": true
+  }
+}
+```
+
+### state.get
+
+Get the global runtime state.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "state.get"
+}
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "result": {
+    "auth": {
+      "enabledProviders": ["openai"],
+      "hasOpenAiToken": true,
+      "hasAntigravityToken": false,
+      "hasOpenRouterKey": false,
+      "antigravityProfile": null
+    },
+    "onboarding": {
+      "completed": true
+    },
+    "model": {
+      "selectedModel": "gpt-4o",
+      "selectedThinking": "MEDIUM",
+      "selectedOpenRouterProvider": "any"
+    }
+  }
+}
+```
+
+### model.list
+
+List available models.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "model.list"
+}
+```
+
+### system.shutdown
+
+Shutdown the RPC server.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 999,
+  "method": "system.shutdown",
+  "params": {
+    "reason": "client_exit"
+  }
+}
+```
+
+## Event Notifications
+
+### session.stream.chunk
+
+Streaming response chunk from the model.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "session.stream.chunk",
+  "params": {
+    "session_id": "abc123",
+    "chunk": {
+      "answerText": "Here's a hello world function:\n"
+    }
+  }
+}
+```
+
+### session.message.appended
+
+A complete message was added to history.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "session.message.appended",
+  "params": {
+    "session_id": "abc123",
+    "message": {
+      "id": 1,
+      "kind": "assistant",
+      "text": "Here's a hello world function:\n\nfunction hello() {\n  console.log('Hello, world!');\n}",
+      "images": []
+    }
+  }
+}
+```
+
+### session.status
+
+Session status changed (pending, ready, etc.).
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "session.status",
+  "params": {
+    "session_id": "abc123",
+    "pending": true,
+    "status_label": "thinking..."
+  }
+}
+```
+
+### session.tool.call.started
+
+The model started calling a tool.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "session.tool.call.started",
+  "params": {
+    "session_id": "abc123",
+    "data": {
+      "tool_name": "bash",
+      "call_id": "call_abc123"
+    }
+  }
+}
+```
+
+### session.tool.call.completed
+
+Tool call finished.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "session.tool.call.completed",
+  "params": {
+    "session_id": "abc123",
+    "data": {
+      "tool_name": "bash",
+      "call_id": "call_abc123",
+      "ok": true
+    }
+  }
+}
+```
+
+### session.context.estimate
+
+Context token estimate updated.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "session.context.estimate",
+  "params": {
+    "session_id": "abc123",
+    "total_tokens_estimate": 1234,
+    "source": "history",
+    "breakdown": {
+      "pinned_tokens": 100,
+      "conversation_tokens": 1000,
+      "tool_schema_tokens": 100,
+      "provider_overhead_tokens": 34
+    }
+  }
+}
+```
+
+### auth.flow.url
+
+OAuth URL for user to visit.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "auth.flow.url",
+  "params": {
+    "provider": "openai",
+    "url": "https://auth.openai.com/authorize?..."
+  }
+}
+```
+
+### auth.flow.completed
+
+OAuth flow completed successfully.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "auth.flow.completed",
+  "params": {
+    "provider": "openai"
+  }
+}
+```
+
+## Transport Details
+
+### Stdio Protocol
+
+- Each request/response/notification is **one line** (terminated by `\n`)
+- Lines are complete JSON objects
+- No batching (batch requests are rejected)
+- Binary data (images) sent as base64 in data URLs
+
+### Lifecycle
+
+1. **Start server:** `loaf rpc`
+2. **Handshake:** Client sends `rpc.handshake`
+3. **Create session:** Client sends `session.create`
+4. **Send messages:** Client sends `session.send`
+5. **Receive events:** Server streams notifications
+6. **Shutdown:** Client sends `system.shutdown` or closes stdin
+
+### Shutdown Signals
+
+The server responds to:
+
+- `SIGINT` (Ctrl+C) → Graceful shutdown
+- `SIGTERM` → Graceful shutdown
+- `stdin` close → Graceful shutdown
+
+From `src/rpc/stdio-server.ts:108-128`
+
+## Example Client
+
+### Python
+
+```python
+import subprocess
+import json
+
+class LoafRpcClient:
+    def __init__(self):
+        self.proc = subprocess.Popen(
+            ["loaf", "rpc"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+            bufsize=1
+        )
+        self.request_id = 0
+        
+    def call(self, method, params=None):
+        self.request_id += 1
+        request = {
+            "jsonrpc": "2.0",
+            "id": self.request_id,
+            "method": method,
+            "params": params or {}
+        }
+        self.proc.stdin.write(json.dumps(request) + "\n")
+        self.proc.stdin.flush()
+        
+        response = json.loads(self.proc.stdout.readline())
+        if "error" in response:
+            raise Exception(response["error"])
+        return response["result"]
+    
+    def listen_events(self):
+        """Generator that yields event notifications"""
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                break
+            msg = json.loads(line)
+            if "method" in msg:  # It's a notification
+                yield msg
+
+# Usage
+client = LoafRpcClient()
+
+# Handshake
+client.call("rpc.handshake", {
+    "client_name": "my_python_client",
+    "client_version": "1.0.0",
+    "protocol_version": "1.0.0"
+})
+
+# Create session
+result = client.call("session.create", {"title": "Test"})
+session_id = result["session_id"]
+
+# Send message
+client.call("session.send", {
+    "session_id": session_id,
+    "text": "Hello!"
+})
+
+# Listen for events
+for event in client.listen_events():
+    if event["method"] == "session.stream.chunk":
+        print(event["params"]["chunk"].get("answerText", ""), end="")
+    elif event["method"] == "session.message.appended":
+        break
+```
+
+### Node.js
+
+```javascript
+import { spawn } from 'child_process';
+import readline from 'readline';
+
+class LoafRpcClient {
+  constructor() {
+    this.proc = spawn('loaf', ['rpc']);
+    this.rl = readline.createInterface({
+      input: this.proc.stdout,
+      crlfDelay: Infinity
+    });
+    this.requestId = 0;
+    this.pending = new Map();
+    
+    this.rl.on('line', (line) => {
+      const msg = JSON.parse(line);
+      
+      if ('id' in msg) {
+        // Response
+        const resolve = this.pending.get(msg.id);
+        if (resolve) {
+          this.pending.delete(msg.id);
+          if (msg.error) {
+            resolve.reject(msg.error);
+          } else {
+            resolve.resolve(msg.result);
+          }
+        }
+      } else if ('method' in msg) {
+        // Event notification
+        this.emit('event', msg);
+      }
+    });
+  }
+  
+  call(method, params = {}) {
+    return new Promise((resolve, reject) => {
+      this.requestId++;
+      const id = this.requestId;
+      
+      this.pending.set(id, { resolve, reject });
+      
+      const request = {
+        jsonrpc: '2.0',
+        id,
+        method,
+        params
+      };
+      
+      this.proc.stdin.write(JSON.stringify(request) + '\n');
+    });
+  }
+  
+  on(event, callback) {
+    // Simple event emitter
+    this[`on_${event}`] = callback;
+  }
+  
+  emit(event, data) {
+    const callback = this[`on_${event}`];
+    if (callback) callback(data);
+  }
+}
+
+// Usage
+const client = new LoafRpcClient();
+
+await client.call('rpc.handshake', {
+  client_name: 'my_node_client',
+  client_version: '1.0.0',
+  protocol_version: '1.0.0'
+});
+
+const { session_id } = await client.call('session.create', {
+  title: 'Test Session'
+});
+
+client.on('event', (event) => {
+  if (event.method === 'session.stream.chunk') {
+    process.stdout.write(event.params.chunk.answerText || '');
+  }
+});
+
+await client.call('session.send', {
+  session_id,
+  text: 'Hello, loaf!'
+});
+```
+
+## Source Code Reference
+
+- RPC server: `src/rpc/stdio-server.ts:18-134`
+- Protocol types: `src/rpc/protocol.ts:1-216`
+- Router (method dispatch): `src/rpc/router.ts`
+- Event notifications: `src/rpc/events.ts`
+- In-process client (used by TUI): `src/rpc/inprocess-client.ts`
+
+<Note>
+The loaf TUI itself uses an in-process RPC client to communicate with the core runtime. This ensures API consistency between interactive and programmatic usage.
+</Note>

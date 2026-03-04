@@ -1,0 +1,406 @@
+---
+title: Custom JavaScript Tools
+description: Create and load your own JavaScript tools into Loaf
+---
+
+Loaf auto-loads custom tools at startup and registers them into the same tool registry used by built-in tools. If a custom tool is valid, it appears in `/tools` and can be called by the model.
+
+You can also have the model create tools for you by calling the built-in `create_persistent_tool`.
+
+## Tool Discovery
+
+Loaf discovers custom tools from:
+
+- **macOS/Linux**: `~/.loaf/tools`
+- **Windows**: `%USERPROFILE%\.loaf\tools`
+
+Supported file extensions:
+- `.js`
+- `.mjs`
+- `.cjs`
+
+Loaf recursively scans the tools directory at startup, excluding `node_modules` directories.
+
+## Tool Module Formats
+
+You can export tools using one of three formats:
+
+### 1. Default Tool Object
+
+Export a tool object as the default export:
+
+```js
+export default {
+  name: "echo_text",
+  description: "echo input text",
+  args: {
+    type: "object",
+    properties: {
+      text: { type: "string", description: "text to echo" },
+    },
+    required: ["text"],
+    additionalProperties: false,
+  },
+  async run(input, context) {
+    return { echoed: String(input.text ?? "") };
+  },
+};
+```
+
+### 2. Named `tool` Export
+
+Export a tool object as a named `tool` export:
+
+```js
+export const tool = {
+  name: "sum_numbers",
+  description: "sum two numbers",
+  inputSchema: {
+    type: "object",
+    properties: {
+      a: { type: "number" },
+      b: { type: "number" },
+    },
+    required: ["a", "b"],
+  },
+  run(input) {
+    return { total: Number(input.a) + Number(input.b) };
+  },
+};
+```
+
+### 3. Meta + Run (Decorator-Like Style)
+
+Separate metadata from implementation:
+
+```js
+export const meta = {
+  name: "hello_user",
+  description: "build a greeting",
+  args: {
+    type: "object",
+    properties: {
+      name: { type: "string" },
+    },
+    required: ["name"],
+  },
+};
+
+export async function run(input) {
+  return { greeting: `hello ${input.name}` };
+}
+```
+
+<Note>
+  JavaScript decorators are not required. If you want decorator-like ergonomics, wrap your own helper in the file, but export one of the supported shapes above.
+</Note>
+
+## Required and Optional Fields
+
+**Required:**
+- `name` (string) - Must match pattern `[a-zA-Z0-9_.:-]+`
+- `run` (function) - Async or sync function that executes the tool
+
+**Optional:**
+- `description` (string) - Describes what the tool does
+- `args` or `inputSchema` (object) - JSON Schema for input validation
+
+## Schema Format
+
+Loaf expects an object schema:
+
+```js
+{
+  type: "object",
+  properties: {
+    fieldName: { type: "string", description: "..." }
+  },
+  required: ["fieldName"],
+  additionalProperties: false
+}
+```
+
+Both `args` and `inputSchema` are treated equivalently for custom tools.
+
+## Runtime Contract
+
+### Input Parameters
+
+Your `run(input, context)` function receives:
+
+- **`input`**: Parsed JSON args from the model matching your schema
+- **`context`**: Runtime context object:
+  ```typescript
+  {
+    now: Date;           // Current timestamp
+    log?: (message: string) => void;  // Optional logging
+    signal?: AbortSignal;  // Cancellation signal
+  }
+  ```
+
+### Return Values
+
+**1. Plain JSON value (implicit success):**
+
+```js
+return { result: "success", count: 42 };
+```
+
+Treated as `ok: true` automatically.
+
+**2. Explicit tool result:**
+
+```js
+return {
+  ok: false,
+  output: { reason: "validation failed" },
+  error: "name is required",
+};
+```
+
+**3. Thrown exceptions:**
+
+If `run` throws, Loaf captures it and reports tool failure.
+
+## Complete Examples
+
+### File Writer Tool
+
+```js
+import fs from "node:fs";
+
+export default {
+  name: "write_note",
+  description: "write a utf-8 note to disk",
+  args: {
+    type: "object",
+    properties: {
+      path: { type: "string" },
+      text: { type: "string" },
+    },
+    required: ["path", "text"],
+    additionalProperties: false,
+  },
+  run(input) {
+    fs.writeFileSync(String(input.path), String(input.text), "utf8");
+    return { ok: true, output: { written: true, path: String(input.path) } };
+  },
+};
+```
+
+### HTTP Request Tool
+
+```js
+export const tool = {
+  name: "fetch_json",
+  description: "fetch JSON from a URL",
+  inputSchema: {
+    type: "object",
+    properties: {
+      url: { type: "string", description: "URL to fetch" },
+    },
+    required: ["url"],
+  },
+  async run(input) {
+    try {
+      const response = await fetch(input.url);
+      if (!response.ok) {
+        return {
+          ok: false,
+          output: { status: response.status },
+          error: `HTTP ${response.status}`,
+        };
+      }
+      const data = await response.json();
+      return { ok: true, output: data };
+    } catch (error) {
+      return {
+        ok: false,
+        output: {},
+        error: error.message,
+      };
+    }
+  },
+};
+```
+
+### Tool with Context Usage
+
+```js
+export const meta = {
+  name: "log_with_timestamp",
+  description: "log a message with current timestamp",
+  args: {
+    type: "object",
+    properties: {
+      message: { type: "string" },
+    },
+    required: ["message"],
+  },
+};
+
+export function run(input, context) {
+  const timestamp = context.now.toISOString();
+  const logLine = `[${timestamp}] ${input.message}`;
+  
+  if (context.log) {
+    context.log(logLine);
+  }
+  
+  return {
+    logged: true,
+    timestamp,
+    message: input.message,
+  };
+}
+```
+
+## Setup Procedure
+
+<Steps>
+  <Step title="Create tools directory">
+    Create the tools directory if it doesn't exist:
+    
+    **macOS/Linux:**
+    ```bash
+    mkdir -p ~/.loaf/tools
+    ```
+    
+    **Windows:**
+    ```powershell
+    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.loaf\tools"
+    ```
+  </Step>
+
+  <Step title="Write your tool file">
+    Create a `.js`, `.mjs`, or `.cjs` file in the tools directory:
+    
+    ```bash
+    # ~/.loaf/tools/my-tool.js
+    ```
+    
+    Use one of the three export formats documented above.
+  </Step>
+
+  <Step title="Start or restart Loaf">
+    Loaf loads custom tools at startup. Launch Loaf:
+    
+    ```bash
+    loaf
+    ```
+    
+    Check the startup logs for tool loading messages.
+  </Step>
+
+  <Step title="Verify tool registration">
+    Run the `/tools` command to list all available tools:
+    
+    ```
+    /tools
+    ```
+    
+    Your custom tool should appear in the list.
+  </Step>
+</Steps>
+
+## Loading and Errors
+
+At startup, Loaf logs custom tool loading outcomes to stdout/stderr.
+
+Common reasons a tool is skipped:
+- No valid export shape found
+- Invalid `name` (doesn't match `[a-zA-Z0-9_.:-]+`)
+- Duplicate tool name (already registered)
+- Syntax/import runtime error in the tool file
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep tools small and single-purpose">
+    Each tool should do one thing well. If you need complex workflows, create multiple tools that can be composed.
+  </Accordion>
+
+  <Accordion title="Validate inputs in run()">
+    While schemas provide basic validation, add runtime checks for business logic:
+    
+    ```js
+    run(input) {
+      if (!input.email.includes('@')) {
+        return {
+          ok: false,
+          output: {},
+          error: "Invalid email format"
+        };
+      }
+      // ...
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use stable tool names">
+    Avoid frequent renames. Tool names are how the model learns to call your tools.
+  </Accordion>
+
+  <Accordion title="Return structured output">
+    Prefer deterministic output objects over free-form strings:
+    
+    ```js
+    // Good
+    return { status: "success", count: 5 };
+    
+    // Avoid
+    return "Operation completed with 5 items";
+    ```
+  </Accordion>
+
+  <Accordion title="Handle errors gracefully">
+    Return explicit error results instead of throwing when possible:
+    
+    ```js
+    try {
+      // operation
+      return { ok: true, output: result };
+    } catch (error) {
+      return {
+        ok: false,
+        output: {},
+        error: error.message
+      };
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## TypeScript Support
+
+While custom tools must be JavaScript files, you can use TypeScript definitions for better IDE support:
+
+```typescript
+import type { ToolInput, ToolContext, ToolResult } from "loaf";
+
+type MyInput = {
+  name: string;
+  age: number;
+};
+
+export const tool = {
+  name: "process_user",
+  description: "process user data",
+  inputSchema: {
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      age: { type: "number" },
+    },
+    required: ["name", "age"],
+  },
+  async run(input: MyInput, context: ToolContext): Promise<ToolResult> {
+    return {
+      ok: true,
+      output: { processed: true }
+    };
+  },
+};
+```
+
+Compile to JavaScript before placing in `~/.loaf/tools`.

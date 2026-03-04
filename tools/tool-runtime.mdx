@@ -1,0 +1,523 @@
+---
+title: 'Tool Runtime'
+description: 'Understanding tool execution, context, and error handling'
+---
+
+## Overview
+
+The `ToolRuntime` class manages tool execution, providing context injection, error handling, and result normalization. It acts as the execution layer between tool calls and tool implementations.
+
+## ToolRuntime Class
+
+The runtime orchestrates tool execution through a registry.
+
+```typescript
+import { ToolRuntime } from "loaf/tools";
+import { createToolRegistry } from "loaf/tools";
+
+const registry = createToolRegistry();
+const runtime = new ToolRuntime(registry);
+```
+
+### Constructor
+
+<ParamField path="registry" type="ToolRegistry" required>
+  The tool registry to use for looking up tools
+</ParamField>
+
+```typescript
+constructor(registry: ToolRegistry)
+```
+
+### execute Method
+
+Executes a tool call with optional context.
+
+```typescript
+async execute(call: ToolCall, context?: Partial<ToolContext>): Promise<ToolResult>
+```
+
+<ParamField path="call" type="ToolCall" required>
+  The tool call to execute
+  
+  <ParamField path="call.id" type="string">
+    Optional call identifier for tracking
+  </ParamField>
+  
+  <ParamField path="call.name" type="string" required>
+    Name of the tool to execute
+  </ParamField>
+  
+  <ParamField path="call.input" type="ToolInput" required>
+    Input parameters for the tool
+  </ParamField>
+</ParamField>
+
+<ParamField path="context" type="Partial<ToolContext>">
+  Optional context to pass to the tool. Missing fields are filled with defaults.
+</ParamField>
+
+<ResponseField name="result" type="ToolResult">
+  The execution result
+  
+  <ResponseField name="ok" type="boolean">
+    `true` if execution succeeded, `false` otherwise
+  </ResponseField>
+  
+  <ResponseField name="output" type="JsonValue">
+    The tool's output or error information
+  </ResponseField>
+  
+  <ResponseField name="error" type="string">
+    Error message if execution failed
+  </ResponseField>
+</ResponseField>
+
+## ToolContext
+
+The context object passed to every tool execution provides runtime information and utilities.
+
+```typescript
+type ToolContext = {
+  now: Date;
+  log?: (message: string) => void;
+  signal?: AbortSignal;
+};
+```
+
+<ParamField path="now" type="Date" required>
+  Current timestamp when the tool started executing. Useful for time-sensitive operations.
+</ParamField>
+
+<ParamField path="log" type="(message: string) => void">
+  Optional logging function. Tools can use this to output progress or debug information without affecting the result.
+</ParamField>
+
+<ParamField path="signal" type="AbortSignal">
+  Optional abort signal for canceling long-running operations. Tools should check this periodically and stop execution if aborted.
+</ParamField>
+
+### Using Context in Tools
+
+```javascript
+export async function run(input, context) {
+  context.log?.("Starting operation...");
+  
+  // Check current time
+  const startTime = context.now.getTime();
+  
+  // Respect abort signals
+  if (context.signal?.aborted) {
+    return {
+      ok: false,
+      output: null,
+      error: "Operation aborted"
+    };
+  }
+  
+  // Long-running operation
+  for (let i = 0; i < 1000; i++) {
+    if (context.signal?.aborted) {
+      return { ok: false, output: null, error: "Aborted" };
+    }
+    // Do work...
+  }
+  
+  context.log?.("Operation complete");
+  
+  return {
+    ok: true,
+    output: { duration: Date.now() - startTime }
+  };
+}
+```
+
+## Execution Flow
+
+The runtime follows this execution flow:
+
+1. **Tool Lookup**: Searches the registry for the tool by name
+2. **Context Resolution**: Merges provided context with defaults
+3. **Tool Execution**: Calls the tool's `run` function
+4. **Error Handling**: Catches exceptions and converts to error results
+5. **Result Normalization**: Ensures result conforms to `ToolResult` type
+
+### Success Path
+
+```typescript
+const result = await runtime.execute({
+  name: "my-tool",
+  input: { query: "test" }
+});
+
+// result = {
+//   ok: true,
+//   output: { /* tool output */ }
+// }
+```
+
+### Tool Not Found
+
+```typescript
+const result = await runtime.execute({
+  id: "call_123",
+  name: "nonexistent-tool",
+  input: {}
+});
+
+// result = {
+//   ok: false,
+//   output: {
+//     callId: "call_123",
+//     tool: "nonexistent-tool",
+//     status: "not_found"
+//   },
+//   error: "unknown tool: nonexistent-tool"
+// }
+```
+
+### Tool Execution Error
+
+```typescript
+const result = await runtime.execute({
+  id: "call_456",
+  name: "failing-tool",
+  input: {}
+});
+
+// result = {
+//   ok: false,
+//   output: {
+//     callId: "call_456",
+//     tool: "failing-tool",
+//     status: "error"
+//   },
+//   error: "Error: Something went wrong"
+// }
+```
+
+## Error Handling
+
+The runtime provides multiple layers of error handling:
+
+### Tool-Level Errors
+
+Tools should return error results for expected failures:
+
+```javascript
+export async function run(input, context) {
+  if (!input.required_field) {
+    return {
+      ok: false,
+      output: { message: "Missing required field" },
+      error: "Validation failed: required_field is missing"
+    };
+  }
+  
+  // Continue with valid input...
+}
+```
+
+### Runtime Exceptions
+
+Unhandled exceptions are caught by the runtime:
+
+```javascript
+export async function run(input, context) {
+  // This exception will be caught by the runtime
+  throw new Error("Unexpected condition");
+}
+
+// Becomes:
+// {
+//   ok: false,
+//   output: { callId, tool, status: "error" },
+//   error: "Unexpected condition"
+// }
+```
+
+### Error Result Structure
+
+All errors follow a consistent structure:
+
+<ResponseField name="ok" type="boolean">
+  Always `false` for errors
+</ResponseField>
+
+<ResponseField name="output" type="object">
+  Error metadata
+  
+  <ResponseField name="output.callId" type="string | null">
+    The call ID if provided
+  </ResponseField>
+  
+  <ResponseField name="output.tool" type="string">
+    The tool name that was called
+  </ResponseField>
+  
+  <ResponseField name="output.status" type="string">
+    Error status: `"not_found"` or `"error"`
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Human-readable error message
+</ResponseField>
+
+## Context Resolution
+
+The runtime automatically fills in missing context fields:
+
+```typescript
+// Minimal context
+await runtime.execute(call, {});
+// Resolved to: { now: new Date() }
+
+// Partial context
+await runtime.execute(call, {
+  log: console.log
+});
+// Resolved to: { now: new Date(), log: console.log }
+
+// Full context
+await runtime.execute(call, {
+  now: new Date('2024-01-01'),
+  log: myLogger,
+  signal: abortController.signal
+});
+// Used as provided
+```
+
+<Note>
+The `now` field is always set to the current time if not provided, ensuring tools have a consistent timestamp for the execution.
+</Note>
+
+## Best Practices
+
+### Handle Abort Signals
+
+For long-running operations, check the abort signal periodically:
+
+```javascript
+export async function run(input, context) {
+  const items = await fetchManyItems(input.count);
+  
+  for (const item of items) {
+    if (context.signal?.aborted) {
+      return {
+        ok: false,
+        output: { processed: results.length },
+        error: "Operation cancelled"
+      };
+    }
+    
+    await processItem(item);
+  }
+  
+  return { ok: true, output: { processed: items.length } };
+}
+```
+
+### Use Logging for Observability
+
+Log important milestones without cluttering the output:
+
+```javascript
+export async function run(input, context) {
+  context.log?.("Validating input...");
+  
+  if (!isValid(input)) {
+    return { ok: false, output: null, error: "Invalid input" };
+  }
+  
+  context.log?.("Fetching data...");
+  const data = await fetchData(input);
+  
+  context.log?.("Processing results...");
+  const results = processData(data);
+  
+  context.log?.("Done");
+  
+  return { ok: true, output: results };
+}
+```
+
+### Return Structured Errors
+
+Provide detailed error information in the output:
+
+```javascript
+export async function run(input, context) {
+  try {
+    const result = await riskyOperation(input);
+    return { ok: true, output: result };
+  } catch (err) {
+    return {
+      ok: false,
+      output: {
+        operation: "riskyOperation",
+        input: input,
+        timestamp: context.now.toISOString()
+      },
+      error: err.message
+    };
+  }
+}
+```
+
+### Validate Input Early
+
+Check input requirements before doing expensive work:
+
+```javascript
+export const inputSchema = {
+  type: "object",
+  properties: {
+    url: { type: "string", format: "uri" },
+    timeout: { type: "number", minimum: 0 }
+  },
+  required: ["url"]
+};
+
+export async function run(input, context) {
+  // Additional validation beyond schema
+  if (input.timeout && input.timeout > 60000) {
+    return {
+      ok: false,
+      output: null,
+      error: "Timeout cannot exceed 60 seconds"
+    };
+  }
+  
+  // Proceed with valid input
+  const result = await fetch(input.url, {
+    signal: context.signal,
+    timeout: input.timeout || 5000
+  });
+  
+  return { ok: true, output: await result.json() };
+}
+```
+
+## Complete Example
+
+Here's a complete example showing all runtime features:
+
+```javascript
+// weather-tool.js
+export const name = "weather";
+export const description = "Fetches weather data for a location";
+
+export const inputSchema = {
+  type: "object",
+  properties: {
+    location: {
+      type: "string",
+      description: "City name or zip code"
+    },
+    units: {
+      type: "string",
+      enum: ["metric", "imperial"],
+      default: "metric"
+    }
+  },
+  required: ["location"]
+};
+
+export async function run(input, context) {
+  context.log?.(`Fetching weather for ${input.location}...`);
+  
+  // Check abort signal before expensive operation
+  if (context.signal?.aborted) {
+    return {
+      ok: false,
+      output: null,
+      error: "Request was cancelled"
+    };
+  }
+  
+  try {
+    const response = await fetch(
+      `https://api.weather.example.com/current?location=${encodeURIComponent(input.location)}&units=${input.units || 'metric'}`,
+      { signal: context.signal }
+    );
+    
+    if (!response.ok) {
+      return {
+        ok: false,
+        output: {
+          status: response.status,
+          location: input.location
+        },
+        error: `Weather API returned ${response.status}`
+      };
+    }
+    
+    const data = await response.json();
+    
+    context.log?.("Weather data retrieved successfully");
+    
+    return {
+      ok: true,
+      output: {
+        location: input.location,
+        temperature: data.temp,
+        conditions: data.conditions,
+        units: input.units || 'metric',
+        timestamp: context.now.toISOString()
+      }
+    };
+  } catch (err) {
+    context.log?.(`Error: ${err.message}`);
+    
+    return {
+      ok: false,
+      output: {
+        location: input.location,
+        error_type: err.name
+      },
+      error: `Failed to fetch weather: ${err.message}`
+    };
+  }
+}
+```
+
+```typescript
+// Using the tool
+import { ToolRuntime } from "loaf/tools";
+import { createToolRegistry } from "loaf/tools";
+
+const registry = createToolRegistry();
+const runtime = new ToolRuntime(registry);
+
+// Load and register the weather tool
+const weatherTool = await loadCustomToolFile("./weather-tool.js");
+if (weatherTool) {
+  registry.register(weatherTool.tool);
+}
+
+// Execute with context
+const abortController = new AbortController();
+
+const result = await runtime.execute(
+  {
+    id: "weather_001",
+    name: "weather",
+    input: {
+      location: "San Francisco",
+      units: "imperial"
+    }
+  },
+  {
+    log: (msg) => console.log(`[weather] ${msg}`),
+    signal: abortController.signal
+  }
+);
+
+if (result.ok) {
+  console.log("Temperature:", result.output.temperature);
+  console.log("Conditions:", result.output.conditions);
+} else {
+  console.error("Error:", result.error);
+}
+```

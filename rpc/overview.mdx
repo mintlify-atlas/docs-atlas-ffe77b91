@@ -1,0 +1,145 @@
+---
+title: Protocol Overview
+description: JSON-RPC 2.0 over stdio with NDJSON framing
+---
+
+The loaf RPC protocol enables programmatic control via JSON-RPC 2.0 messages over standard input/output.
+
+## Transport & Framing
+
+**Transport**: stdio (standard input/output)  
+**Framing**: NDJSON (newline-delimited JSON)  
+**Protocol**: JSON-RPC 2.0  
+**Batching**: Not supported in v1
+
+Each message is a single JSON object terminated by a newline character (`\n`). The server reads from stdin and writes to stdout.
+
+## Starting the Server
+
+```bash
+npm run rpc
+# or during development
+npm run dev -- rpc
+```
+
+The server listens on stdin and emits responses and events on stdout.
+
+## Message Format
+
+### Request
+
+Clients send JSON-RPC 2.0 requests:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "session.create",
+  "params": {
+    "title": "My Session"
+  }
+}
+```
+
+**Fields**:
+- `jsonrpc`: Always `"2.0"`
+- `id`: String, number, or null (required for requests)
+- `method`: Method name (e.g., `"rpc.handshake"`, `"session.send"`)
+- `params`: Optional parameters (object or array)
+
+### Response
+
+Server returns results or errors:
+
+**Success**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "session_id": "abc123"
+  }
+}
+```
+
+**Error**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32601,
+    "message": "method not found: invalid.method",
+    "data": {
+      "reason": "method_not_found",
+      "method": "invalid.method"
+    }
+  }
+}
+```
+
+### Notifications
+
+Server emits events as JSON-RPC notifications (no `id` field):
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "type": "session.status",
+    "timestamp": "2026-03-04T12:00:00.000Z",
+    "payload": {
+      "session_id": "abc123",
+      "pending": true,
+      "status_label": "thinking..."
+    }
+  }
+}
+```
+
+## Error Codes
+
+Standard JSON-RPC 2.0 error codes:
+
+| Code | Name | Description |
+|------|------|-------------|
+| `-32700` | Parse Error | Invalid JSON received |
+| `-32600` | Invalid Request | Request structure invalid |
+| `-32601` | Method Not Found | Method does not exist |
+| `-32602` | Invalid Params | Invalid method parameters |
+| `-32603` | Internal Error | Server-side error |
+| `-32000` | Server Error | Generic server error |
+
+## Event Types
+
+The server emits these event notifications:
+
+- `session.status` - Session state updates
+- `session.message.appended` - New messages added
+- `session.stream.chunk` - Streaming response chunks
+- `session.tool.call.started` - Tool execution started
+- `session.tool.call.completed` - Tool execution finished
+- `session.tool.results` - Tool results available
+- `session.completed` - Session task completed
+- `session.interrupted` - Session interrupted by user
+- `session.error` - Session error occurred
+- `auth.flow.started` - OAuth flow initiated
+- `auth.flow.url` - Browser URL for OAuth
+- `auth.flow.device_code` - Device code for OAuth
+- `auth.flow.completed` - OAuth successful
+- `auth.flow.failed` - OAuth failed
+- `state.changed` - Runtime state changed
+
+## Shutdown
+
+The server shuts down gracefully when:
+- Client calls `system.shutdown`
+- Stdin is closed
+- Process receives SIGINT/SIGTERM
+
+## Protocol Version
+
+Current version: `1.0.0`
+
+The protocol follows **additive-first** versioning: new methods and event types may be added without breaking existing clients. Method names and semantics remain stable within major version 1.

@@ -1,0 +1,282 @@
+---
+title: 'File Operations'
+description: 'Read, list, search, and patch files in the local filesystem'
+---
+
+## Overview
+
+The file operations tools provide efficient ways to interact with the local filesystem, including reading files with advanced modes, listing directories, searching file contents, and applying patches.
+
+## read_file
+
+Reads a local file with 1-indexed line numbers, supporting slice and indentation-aware block modes.
+
+### Parameters
+
+<ParamField path="file_path" type="string" required>
+  Absolute path to the file.
+</ParamField>
+
+<ParamField path="offset" type="number" default="1">
+  The line number to start reading from. Must be 1 or greater.
+</ParamField>
+
+<ParamField path="limit" type="number" default="2000">
+  The maximum number of lines to return.
+</ParamField>
+
+<ParamField path="mode" type="string" default="slice">
+  Optional mode selector: `slice` for simple ranges (default) or `indentation` to expand around an anchor line.
+</ParamField>
+
+<ParamField path="indentation" type="object">
+  Configuration for indentation mode.
+  
+  <ParamField path="indentation.anchor_line" type="number">
+    Anchor line to center the indentation lookup on (defaults to offset).
+  </ParamField>
+  
+  <ParamField path="indentation.max_levels" type="number" default="0">
+    How many parent indentation levels (smaller indents) to include.
+  </ParamField>
+  
+  <ParamField path="indentation.include_siblings" type="boolean" default="false">
+    When true, include additional blocks that share the anchor indentation.
+  </ParamField>
+  
+  <ParamField path="indentation.include_header" type="boolean" default="true">
+    Include doc comments or attributes directly above the selected block.
+  </ParamField>
+  
+  <ParamField path="indentation.max_lines" type="number">
+    Hard cap on the number of lines returned when using indentation mode.
+  </ParamField>
+</ParamField>
+
+### Usage Examples
+
+```typescript
+// Simple slice read
+await read_file({
+  file_path: "/path/to/file.ts",
+  offset: 10,
+  limit: 50
+});
+
+// Indentation mode - read a function with its parent class
+await read_file({
+  file_path: "/path/to/file.ts",
+  mode: "indentation",
+  indentation: {
+    anchor_line: 42,
+    max_levels: 1,
+    include_header: true
+  }
+});
+```
+
+### Indentation Mode
+
+Indentation mode is useful for reading code blocks intelligently:
+
+- **anchor_line**: The line number you're interested in (e.g., line 42 inside a function)
+- **max_levels**: How many parent scopes to include (0 = just the anchor block, 1 = anchor + parent class/function, etc.)
+- **include_siblings**: Whether to include other methods/functions at the same indentation level
+- **include_header**: Whether to include doc comments and decorators above the block
+
+## list_dir
+
+Lists entries in a local directory with 1-indexed entry numbers and simple type labels.
+
+### Parameters
+
+<ParamField path="dir_path" type="string" required>
+  Absolute path to the directory to list.
+</ParamField>
+
+<ParamField path="offset" type="number" default="1">
+  The entry number to start listing from. Must be 1 or greater.
+</ParamField>
+
+<ParamField path="limit" type="number" default="25">
+  The maximum number of entries to return.
+</ParamField>
+
+<ParamField path="depth" type="number" default="2">
+  The maximum directory depth to traverse. Must be 1 or greater.
+</ParamField>
+
+### Usage Example
+
+```typescript
+await list_dir({
+  dir_path: "/path/to/project",
+  depth: 3,
+  limit: 100
+});
+```
+
+### Output Format
+
+Entries are marked with suffixes:
+- `/` - Directory
+- `@` - Symlink
+- `?` - Other (socket, pipe, etc.)
+- (no suffix) - Regular file
+
+## grep_files
+
+Finds files whose contents match a regex pattern and lists them sorted by modification time.
+
+### Parameters
+
+<ParamField path="pattern" type="string" required>
+  Regular expression pattern to search for.
+</ParamField>
+
+<ParamField path="include" type="string">
+  Optional glob that limits which files are searched (e.g., `"*.rs"` or `"*.{ts,tsx}"`).
+</ParamField>
+
+<ParamField path="path" type="string">
+  Directory or file path to search. Defaults to the session's working directory.
+</ParamField>
+
+<ParamField path="limit" type="number" default="100">
+  Maximum number of file paths to return (max 2000).
+</ParamField>
+
+### Usage Examples
+
+```typescript
+// Search all files for a pattern
+await grep_files({
+  pattern: "function\\s+handleClick"
+});
+
+// Search only TypeScript files
+await grep_files({
+  pattern: "export\\s+class",
+  include: "*.ts"
+});
+
+// Search in specific directory
+await grep_files({
+  pattern: "TODO:",
+  path: "/path/to/project/src",
+  include: "*.{ts,tsx}",
+  limit: 50
+});
+```
+
+### Notes
+
+- Uses ripgrep (`rg`) for fast searching
+- Results are sorted by file modification time (most recent first)
+- Supports full regex syntax
+- Returns file paths with matches (not the match content itself)
+
+## apply_patch
+
+Applies a structured patch to add, update, move, or delete files.
+
+### Parameters
+
+<ParamField path="input" type="string" required>
+  The entire contents of the apply_patch command, from `*** Begin Patch` to `*** End Patch`.
+</ParamField>
+
+### Patch Format
+
+Patches must be wrapped in markers:
+
+```
+*** Begin Patch
+[hunks]
+*** End Patch
+```
+
+#### Add File
+
+```
+*** Add File: path/to/new-file.ts
++export function hello() {
++  console.log("Hello, world!");
++}
+```
+
+#### Delete File
+
+```
+*** Delete File: path/to/old-file.ts
+```
+
+#### Update File
+
+```
+*** Update File: path/to/existing-file.ts
+@@ export function greet
+-export function greet(name: string) {
+-  console.log(`Hello, ${name}`);
++export function greet(name: string, greeting = "Hello") {
++  console.log(`${greeting}, ${name}`);
+ }
+```
+
+#### Move File
+
+```
+*** Update File: path/to/old-location.ts
+*** Move to: path/to/new-location.ts
+@@ 
+ export function example() {
+   return true;
+ }
+```
+
+### Change Context
+
+Each update chunk should start with `@@` followed by a context string that helps locate the change:
+
+```
+@@ function handleSubmit
+-  const data = form.getData();
++  const data = await form.getData();
+```
+
+### End of File
+
+To mark changes at the end of a file, add `*** End of File`:
+
+```
+@@ export default App
+ export default App;
++
++// Export types
++export type { AppProps };
+*** End of File
+```
+
+### Usage Example
+
+```typescript
+await apply_patch({
+  input: `*** Begin Patch
+*** Update File: src/config.ts
+@@ export const API_URL
+-export const API_URL = 'http://localhost:3000';
++export const API_URL = process.env.API_URL || 'http://localhost:3000';
+*** End Patch`
+});
+```
+
+### Matching Algorithm
+
+The patch system tries multiple matching strategies in order:
+
+1. **Exact match** - Character-for-character equality
+2. **Trim end** - Ignores trailing whitespace
+3. **Trim** - Ignores leading and trailing whitespace
+4. **Normalize** - Converts Unicode quotes, dashes, and spaces to ASCII equivalents
+
+This makes patches resilient to whitespace changes and Unicode normalization.

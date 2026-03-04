@@ -1,0 +1,594 @@
+---
+title: Creating Skills
+description: Create SKILL.md files to teach Loaf specialized workflows and domain knowledge
+---
+
+Skills are specialized instruction sets that teach Loaf how to handle specific tasks or domains. Each skill is a `SKILL.md` file containing markdown-formatted instructions that get injected into the conversation context.
+
+## Skill Discovery
+
+Loaf discovers skills from three locations, in order of precedence:
+
+1. **Repository skills**: `.agents/skills/` directory in your project
+2. **User data skills**: `~/.loaf/skills/`
+3. **Global skills**: `~/.agents/skills/`
+
+### Repository Skills Discovery
+
+When running inside a git repository, Loaf searches for `.agents/skills/` directories:
+
+- Finds the git repository root (marked by `.git` directory)
+- Searches all directories between the repository root and current working directory
+- Looks for `.agents/skills/` in each directory
+- Allows nested skills for monorepos or multi-project setups
+
+**Example structure:**
+```
+project-root/
+├── .git/
+├── .agents/
+│   └── skills/
+│       ├── api-testing/
+│       │   └── SKILL.md
+│       └── database/
+│           └── SKILL.md
+└── services/
+    └── backend/
+        └── .agents/
+            └── skills/
+                └── backend-deploy/
+                    └── SKILL.md
+```
+
+### Skill File Requirements
+
+- Must be named exactly `SKILL.md` (case-sensitive)
+- Must be in a directory (the directory name becomes the skill name)
+- Can be nested up to 6 levels deep from the skills directory
+- Directories starting with `.` are skipped (except `.agents`)
+- Maximum 2,000 skill directories per root directory
+
+## Skill File Format
+
+### Basic Structure
+
+A `SKILL.md` file contains markdown content with instructions:
+
+```markdown
+Deploy applications to production using the deployment pipeline.
+
+This skill handles:
+- Building Docker images
+- Running tests before deployment
+- Deploying to staging first
+- Promoting to production after validation
+
+## Workflow
+
+<Steps>
+  <Step title="Run tests">
+    Execute the test suite with `npm test` to ensure all tests pass before deployment.
+  </Step>
+
+  <Step title="Build image">
+    Build the Docker image with the appropriate version tag.
+  </Step>
+
+  <Step title="Deploy to staging">
+    Deploy to staging environment and validate functionality before promoting to production.
+  </Step>
+</Steps>
+
+## Best Practices
+
+- Always run tests first
+- Use semantic versioning
+- Monitor logs after deployment
+```
+
+### Description Extraction
+
+Loaf automatically extracts a skill description from the `SKILL.md` content:
+
+1. Splits content into paragraphs (separated by blank lines)
+2. Finds the first non-header, non-code-fence paragraph
+3. Cleans markdown formatting (bold, inline code, list markers)
+4. Uses the first 8 words as a preview
+
+**Example:**
+```markdown
+# My Skill
+
+Deploy applications to production using the deployment pipeline.
+
+This skill handles Docker deployments...
+```
+
+Description: "Deploy applications to production using the deployment pipeline."
+
+Preview: "Deploy applications to production using the deployment..."
+
+## Naming Conventions
+
+### Skill Names
+
+The skill name is derived from its directory name:
+
+```
+~/.loaf/skills/api-testing/SKILL.md  → skill name: "api-testing"
+~/.loaf/skills/deploy/SKILL.md       → skill name: "deploy"
+```
+
+**Best practices:**
+- Use lowercase with hyphens: `api-testing`, `code-review`
+- Be descriptive but concise: `database-migrations` not `db`
+- Avoid special characters (they're allowed but less readable)
+
+### Case Sensitivity
+
+Skill matching is case-insensitive:
+- Directory: `API-Testing/` → skill name: `API-Testing`
+- User types: `/skill api-testing` → matches `API-Testing`
+
+## Creating a Skill
+
+<Steps>
+  <Step title="Choose skill location">
+    Decide where to create your skill:
+    
+    **Project-specific** (recommended for team workflows):
+    ```bash
+    mkdir -p .agents/skills/my-skill
+    ```
+    
+    **User-specific** (for personal workflows):
+    ```bash
+    mkdir -p ~/.loaf/skills/my-skill
+    ```
+    
+    **Global** (shared across all users):
+    ```bash
+    mkdir -p ~/.agents/skills/my-skill
+    ```
+  </Step>
+
+  <Step title="Create SKILL.md file">
+    Create the skill file in the directory:
+    
+    ```bash
+    # For project-specific
+    touch .agents/skills/my-skill/SKILL.md
+    
+    # For user-specific
+    touch ~/.loaf/skills/my-skill/SKILL.md
+    ```
+  </Step>
+
+  <Step title="Write skill content">
+    Open `SKILL.md` and write your instructions:
+    
+    ```markdown
+    Brief description of what this skill does.
+    
+    ## Overview
+    
+    More detailed explanation...
+    
+    ## Workflow
+    
+    Step-by-step instructions...
+    
+    ## Examples
+    
+    Example commands and outputs...
+    ```
+  </Step>
+
+  <Step title="Test the skill">
+    Start or restart Loaf, then list skills:
+    
+    ```
+    /skills
+    ```
+    
+    Your skill should appear in the list. Load it:
+    
+    ```
+    /skill my-skill
+    ```
+  </Step>
+</Steps>
+
+## Skill Content Guidelines
+
+### Start with Clear Description
+
+Begin with a concise description (will be used for skill discovery):
+
+```markdown
+Review pull requests for code quality, security, and best practices.
+
+This skill provides guidelines for...
+```
+
+### Use Structured Sections
+
+Organize content with clear headings:
+
+```markdown
+## Purpose
+
+What this skill does...
+
+## When to Use
+
+Scenarios where this skill applies...
+
+## Workflow
+
+Step-by-step process...
+
+## Examples
+
+Concrete examples...
+
+## Troubleshooting
+
+Common issues and solutions...
+```
+
+### Include Executable Examples
+
+Provide working code snippets:
+
+```markdown
+## Database Migration
+
+Create a new migration:
+
+```bash
+npm run migrate:create -- add_users_table
+```
+
+Apply migrations:
+
+```bash
+npm run migrate:up
+```
+```
+
+### Reference Project Structure
+
+Help Loaf understand your codebase:
+
+```markdown
+## Project Structure
+
+- `src/api/` - API route handlers
+- `src/models/` - Database models
+- `src/services/` - Business logic
+- `tests/` - Test files
+
+Always add tests in `tests/` directory matching the source file name.
+```
+
+### Document Tools and Dependencies
+
+List required tools and configurations:
+
+```markdown
+## Requirements
+
+- Node.js 18+
+- Docker installed and running
+- AWS CLI configured with credentials
+- Environment variables in `.env`:
+  - `DATABASE_URL`
+  - `API_KEY`
+```
+
+## Example Skills
+
+### Code Review Skill
+
+```markdown
+Review code changes for quality, security, and adherence to project standards.
+
+When reviewing code:
+
+## Checklist
+
+- [ ] Code follows project style guide
+- [ ] Tests are included and passing
+- [ ] No security vulnerabilities (SQL injection, XSS, etc.)
+- [ ] Error handling is appropriate
+- [ ] Documentation is updated
+- [ ] No hardcoded secrets or credentials
+
+## Security Checks
+
+1. **Input validation**: All user inputs are validated
+2. **Authentication**: Protected routes check authentication
+3. **SQL queries**: Use parameterized queries, never string concatenation
+4. **Dependencies**: No known vulnerabilities (check `npm audit`)
+
+## Style Guide
+
+- Use TypeScript strict mode
+- Prefer `const` over `let`
+- Async functions for all I/O operations
+- Maximum line length: 100 characters
+
+## Comment Style
+
+Provide constructive feedback:
+- Explain the "why" not just "what"
+- Suggest improvements, don't just criticize
+- Link to documentation or examples
+- Use "we" not "you" to be collaborative
+```
+
+### API Testing Skill
+
+```markdown
+Test REST API endpoints using the project's testing framework.
+
+Locate test files in `tests/api/` directory.
+
+## Test Structure
+
+Each endpoint test should include:
+
+1. **Happy path**: Test successful requests
+2. **Error cases**: Test validation and error responses
+3. **Edge cases**: Test boundary conditions
+4. **Authentication**: Test auth requirements
+
+## Example Test
+
+```typescript
+describe('POST /api/users', () => {
+  it('creates a new user with valid data', async () => {
+    const response = await request(app)
+      .post('/api/users')
+      .send({
+        email: 'test@example.com',
+        name: 'Test User'
+      })
+      .expect(201);
+
+    expect(response.body).toHaveProperty('id');
+    expect(response.body.email).toBe('test@example.com');
+  });
+
+  it('rejects invalid email format', async () => {
+    const response = await request(app)
+      .post('/api/users')
+      .send({
+        email: 'invalid-email',
+        name: 'Test User'
+      })
+      .expect(400);
+
+    expect(response.body.error).toContain('email');
+  });
+});
+```
+
+## Running Tests
+
+```bash
+# Run all API tests
+npm test -- tests/api/
+
+# Run specific test file
+npm test -- tests/api/users.test.ts
+
+# Watch mode during development
+npm test -- --watch tests/api/
+```
+
+## Assertions
+
+Use these matchers:
+- `expect(status).toBe(200)` - Exact equality
+- `expect(body).toHaveProperty('id')` - Property exists
+- `expect(error).toContain('message')` - String contains
+- `expect(array).toHaveLength(5)` - Array length
+```
+
+### Database Migration Skill
+
+```markdown
+Create and manage database migrations using Knex.js.
+
+Migrations are in `db/migrations/` directory.
+
+## Creating Migrations
+
+```bash
+# Create a new migration
+npm run migrate:make migration_name
+```
+
+Use descriptive names:
+- `create_users_table`
+- `add_email_to_customers`
+- `remove_deprecated_fields`
+
+## Migration Template
+
+```javascript
+exports.up = function(knex) {
+  return knex.schema.createTable('table_name', (table) => {
+    table.increments('id').primary();
+    table.string('name').notNullable();
+    table.timestamps(true, true);
+  });
+};
+
+exports.down = function(knex) {
+  return knex.schema.dropTable('table_name');
+};
+```
+
+## Running Migrations
+
+```bash
+# Apply all pending migrations
+npm run migrate:latest
+
+# Rollback last migration
+npm run migrate:rollback
+
+# Rollback all migrations
+npm run migrate:rollback --all
+```
+
+## Best Practices
+
+1. **Always provide down()**: Make migrations reversible
+2. **Test rollback**: Verify down() works before committing
+3. **One change per migration**: Keep migrations focused
+4. **Use transactions**: Wrap multiple operations
+5. **Backup data**: Before running in production
+
+## Column Types
+
+- `table.increments('id')` - Auto-incrementing primary key
+- `table.string('name', 255)` - VARCHAR
+- `table.text('description')` - TEXT
+- `table.integer('count')` - INTEGER
+- `table.boolean('active')` - BOOLEAN
+- `table.timestamps(true, true)` - created_at, updated_at
+- `table.json('data')` - JSON column
+```
+
+## Advanced Features
+
+### Bundled Resources
+
+Include files alongside `SKILL.md`:
+
+```
+my-skill/
+├── SKILL.md
+├── templates/
+│   └── config.yaml
+└── scripts/
+    └── setup.sh
+```
+
+Reference in skill:
+
+```markdown
+Use the setup script:
+
+```bash
+bash .agents/skills/my-skill/scripts/setup.sh
+```
+```
+
+### Skill Chaining
+
+Reference other skills in your skill:
+
+```markdown
+Before deployment, ensure code quality:
+
+1. Load the code-review skill: `/skill code-review`
+2. Review all changes
+3. Once approved, proceed with deployment
+```
+
+### Dynamic Content
+
+Use markdown variables (if your project supports them):
+
+```markdown
+Current project: {{PROJECT_NAME}}
+Environment: {{ENVIRONMENT}}
+```
+
+## Troubleshooting
+
+### Skill Not Found
+
+**Problem**: `/skill my-skill` returns "skill not found"
+
+**Solutions**:
+1. Verify file is named exactly `SKILL.md` (case-sensitive)
+2. Check skill directory exists
+3. Restart Loaf to reload skills
+4. Run `/skills` to list discovered skills
+
+### Empty Skill Content
+
+**Problem**: Skill loads but has no effect
+
+**Solutions**:
+1. Ensure `SKILL.md` is not empty
+2. Check file encoding is UTF-8
+3. Verify markdown is properly formatted
+
+### Skill Not Discovered
+
+**Problem**: Skill doesn't appear in `/skills` list
+
+**Solutions**:
+1. Verify you're in a git repository (for project skills)
+2. Check directory structure: `.agents/skills/skill-name/SKILL.md`
+3. Ensure no typos in directory names
+4. Check scan depth (max 6 levels deep)
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Version control skills with code">
+    Keep project skills in `.agents/skills/` and commit to git:
+    
+    ```gitignore
+    # .gitignore
+    # DO NOT ignore .agents/
+    ```
+    
+    This ensures team members share the same workflows.
+  </Accordion>
+
+  <Accordion title="Keep skills focused">
+    Each skill should handle one domain or workflow. Split large skills:
+    
+    - `deployment/` - Deployment procedures
+    - `testing/` - Testing strategies
+    - `code-review/` - Review guidelines
+  </Accordion>
+
+  <Accordion title="Update skills regularly">
+    As your project evolves, update skills:
+    
+    - Add new tools and commands
+    - Remove deprecated workflows
+    - Update examples with current code
+  </Accordion>
+
+  <Accordion title="Document skill dependencies">
+    If a skill requires other skills or tools:
+    
+    ```markdown
+    ## Prerequisites
+    
+    - Load the testing skill first: `/skill testing`
+    - Requires Docker installed
+    - Needs `.env` file configured
+    ```
+  </Accordion>
+
+  <Accordion title="Test skills with real tasks">
+    After creating a skill, test it:
+    
+    1. Load the skill: `/skill my-skill`
+    2. Ask Loaf to perform the workflow
+    3. Verify instructions are clear and complete
+    4. Refine based on results
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,442 @@
+---
+title: Tool System
+description: Understand loaf's extensible tool architecture for custom capabilities
+---
+
+## Overview
+
+Loaf's tool system provides an extensible runtime for executing operations. Tools are functions with typed inputs and outputs that loaf can invoke to perform file operations, run commands, search the web, and more.
+
+## Architecture
+
+### Tool Definition
+
+Every tool implements the `ToolDefinition` interface:
+
+```typescript
+type ToolDefinition<TInput extends ToolInput = ToolInput, TOutput extends JsonValue = JsonValue> = {
+  name: string;
+  description: string;
+  inputSchema?: {
+    type: "object";
+    properties: Record<string, Record<string, unknown>>;
+    required?: string[];
+    additionalProperties?: boolean;
+  };
+  run: (input: TInput, context: ToolContext) => Promise<ToolResult<TOutput>> | ToolResult<TOutput>;
+};
+```
+
+### Tool Context
+
+Tools receive a context object with runtime information:
+
+```typescript
+type ToolContext = {
+  now: Date;            // Current timestamp
+  log?: (message: string) => void; // Optional logging
+  signal?: AbortSignal; // Cancellation signal
+};
+```
+
+### Tool Result
+
+All tools return a structured result:
+
+```typescript
+type ToolResult<TOutput extends JsonValue = JsonValue> = {
+  ok: boolean;      // Success/failure
+  output: TOutput;  // Result data
+  error?: string;   // Error message if ok is false
+};
+```
+
+## Built-in Tools
+
+Loaf includes several categories of built-in tools:
+
+### Bash Tools
+
+<CodeGroup>
+```typescript src/tools/builtin/bash.ts
+export const BASH_BUILTIN_TOOLS = [
+  {
+    name: "bash",
+    description: "Execute shell commands with timeout and environment control",
+    run: async (input, context) => {
+      // Command execution logic
+    }
+  },
+  {
+    name: "read_background_bash",
+    description: "Read output from background bash session",
+  },
+  {
+    name: "write_background_bash",
+    description: "Send input to background bash session",
+  },
+  {
+    name: "stop_background_bash",
+    description: "Stop a background bash session",
+  },
+  {
+    name: "list_background_bash",
+    description: "List active background bash sessions",
+  },
+  {
+    name: "resize_background_bash",
+    description: "Resize background bash terminal",
+  },
+];
+```
+</CodeGroup>
+
+Background bash sessions support:
+- Interactive TUI applications
+- Long-running processes
+- PTY-based terminal emulation
+- Session management and reuse
+
+### File Operations Tools
+
+<CodeGroup>
+```typescript src/tools/builtin/file-ops.ts
+export const FILE_OPS_BUILTIN_TOOLS = [
+  {
+    name: "read_file",
+    description: "Read file contents with line offsets and indentation-aware slicing",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file_path: { type: "string", description: "Path to file" },
+        offset: { type: "number", description: "Line number to start (0-based)" },
+        limit: { type: "number", description: "Max lines to read" },
+        mode: { type: "string", enum: ["slice", "indentation"] },
+        indentation: { type: "object" },
+      },
+      required: ["file_path"],
+    },
+  },
+  {
+    name: "list_dir",
+    description: "List directory contents with depth control",
+  },
+  {
+    name: "grep_files",
+    description: "Search file contents using ripgrep",
+  },
+  {
+    name: "apply_patch",
+    description: "Apply unified diff patches to files",
+  },
+];
+```
+</CodeGroup>
+
+Features:
+- **Indentation-aware reading** - Extract code blocks by indentation level
+- **Large file handling** - Offset/limit for reading specific sections
+- **Fast search** - Uses ripgrep for content search
+- **Safe patching** - Unified diff format with validation
+
+### JavaScript Tools
+
+<CodeGroup>
+```typescript src/tools/builtin/javascript.ts
+export const JAVASCRIPT_BUILTIN_TOOLS = [
+  {
+    name: "install_js_packages",
+    description: "Install npm packages in isolated environment",
+  },
+  {
+    name: "run_js",
+    description: "Execute JavaScript code with installed packages",
+  },
+  {
+    name: "run_js_module",
+    description: "Run JavaScript module files",
+  },
+  {
+    name: "start_background_js",
+    description: "Start long-running JavaScript process",
+  },
+  {
+    name: "read_background_js",
+    description: "Read output from background JavaScript process",
+  },
+  {
+    name: "write_background_js",
+    description: "Send input to background JavaScript process",
+  },
+  {
+    name: "stop_background_js",
+    description: "Stop background JavaScript process",
+  },
+  {
+    name: "list_background_js",
+    description: "List active background JavaScript sessions",
+  },
+];
+```
+</CodeGroup>
+
+### Web Search Tools
+
+Integration with Exa for web search:
+
+```typescript
+import { createExaBuiltinTools } from "./builtin/exa.js";
+
+const EXA_BUILTIN_TOOLS = createExaBuiltinTools({
+  getApiKey: () => process.env.EXA_API_KEY || loafConfig.exaApiKey,
+});
+
+// Tool: search_web
+// Searches web with Exa and returns URLs with highlights
+```
+
+### Persistent Tool Creation
+
+```typescript
+const persistentToolTool = createPersistentToolTool({
+  registry,
+  isBuiltinToolName: (name) => builtinToolNames.has(name),
+});
+
+// Tool: create_persistent_tool
+// Dynamically creates and registers new tools at runtime
+```
+
+## Custom Tools
+
+Create custom tools by placing JavaScript/TypeScript files in `~/.loaf/tools/`:
+
+### File Structure
+
+```
+~/.loaf/tools/
+├── my-custom-tool.js
+├── api-client/
+│   └── index.mjs
+└── formatters/
+    ├── json.js
+    └── xml.js
+```
+
+### Tool Export Formats
+
+Loaf supports multiple export patterns:
+
+<CodeGroup>
+```javascript Direct Export
+// my-tool.js
+export const name = "my_tool";
+export const description = "Does something useful";
+export const inputSchema = {
+  type: "object",
+  properties: {
+    input: { type: "string" },
+  },
+  required: ["input"],
+};
+
+export async function run(input, context) {
+  return {
+    ok: true,
+    output: { result: input.input.toUpperCase() },
+  };
+}
+```
+
+```javascript Tool Object
+// my-tool.js
+export const tool = {
+  name: "my_tool",
+  description: "Does something useful",
+  inputSchema: {
+    type: "object",
+    properties: {
+      input: { type: "string" },
+    },
+    required: ["input"],
+  },
+  run: async (input, context) => {
+    return {
+      ok: true,
+      output: { result: input.input.toUpperCase() },
+    };
+  },
+};
+```
+
+```javascript Default Export
+// my-tool.js
+export default {
+  name: "my_tool",
+  description: "Does something useful",
+  run: async (input) => {
+    return {
+      ok: true,
+      output: input,
+    };
+  },
+};
+```
+
+```javascript Meta Pattern
+// my-tool.js
+export const meta = {
+  name: "my_tool",
+  description: "Does something useful",
+};
+
+export async function run(input, context) {
+  return { ok: true, output: {} };
+}
+```
+</CodeGroup>
+
+### Tool Name Requirements
+
+Tool names must match the pattern:
+
+```typescript
+const CUSTOM_TOOL_NAME_PATTERN = /^[a-zA-Z0-9_.:-]+$/;
+```
+
+Valid characters: letters, numbers, `_`, `.`, `:`, `-`
+
+### Loading Custom Tools
+
+```typescript
+import { loadCustomTools } from "./tools/index.js";
+
+const result = await loadCustomTools();
+console.log(`Searched: ${result.searchedDirectories}`);
+console.log(`Loaded: ${result.loaded.length} tools`);
+result.errors.forEach(err => console.error(err));
+```
+
+Loaded tools are automatically registered in the default tool registry.
+
+## Tool Registry
+
+The `ToolRegistry` manages available tools:
+
+```typescript
+import { createToolRegistry } from "./tools/registry.js";
+
+const registry = createToolRegistry()
+  .register(myTool)
+  .registerMany([tool1, tool2, tool3]);
+
+// Check if tool exists
+if (registry.has("my_tool")) {
+  const tool = registry.get("my_tool");
+}
+
+// List all tools
+const allTools = registry.list(); // Sorted by name
+
+// Get manifest for model
+const manifest = registry.getModelManifest();
+// Returns: [{ name, description, inputSchema }]
+
+// Unregister a tool
+registry.unregister("my_tool");
+```
+
+### Registry Features
+
+- **Uniqueness enforcement** - Duplicate names throw errors
+- **Sorted listing** - Tools returned in alphabetical order
+- **Model manifest** - Generate schema for LLM tool use
+- **Type safety** - Full TypeScript support
+
+## Tool Runtime
+
+The `ToolRuntime` executes tool calls:
+
+```typescript
+import { ToolRuntime } from "./tools/runtime.js";
+import { defaultToolRegistry } from "./tools/index.js";
+
+const runtime = new ToolRuntime(defaultToolRegistry);
+
+const result = await runtime.execute(
+  {
+    id: "call-123",
+    name: "read_file",
+    input: { file_path: "/path/to/file.txt" },
+  },
+  {
+    now: new Date(),
+    log: (msg) => console.log(msg),
+  }
+);
+
+if (result.ok) {
+  console.log("Success:", result.output);
+} else {
+  console.error("Error:", result.error);
+}
+```
+
+### Error Handling
+
+The runtime handles:
+- **Unknown tools** - Returns `{ ok: false, error: "unknown tool: ..." }`
+- **Execution errors** - Catches exceptions and returns structured error
+- **Cancellation** - Respects AbortSignal in context
+
+## Configuration
+
+Configure tool behavior:
+
+```typescript
+import { configureBuiltinTools } from "./tools/index.js";
+
+configureBuiltinTools({
+  exaApiKey: "your-exa-api-key",
+});
+```
+
+## Source Code Reference
+
+- **`src/tools/types.ts`** - Core type definitions (src/tools/types.ts:1)
+- **`src/tools/registry.ts`** - Tool registry implementation (src/tools/registry.ts:1)
+- **`src/tools/runtime.ts`** - Tool execution runtime (src/tools/runtime.ts:1)
+- **`src/tools/custom.ts`** - Custom tool discovery and loading (src/tools/custom.ts:1)
+- **`src/tools/index.ts`** - Tool system exports and defaults (src/tools/index.ts:1)
+- **`src/tools/builtin/`** - Built-in tool implementations
+
+## Best Practices
+
+### Writing Custom Tools
+
+1. **Single responsibility** - Each tool does one thing well
+2. **Clear naming** - Use descriptive, action-oriented names
+3. **Schema validation** - Define comprehensive input schemas
+4. **Error handling** - Return structured errors, don't throw
+5. **Idempotency** - Tools should be safe to retry
+6. **Documentation** - Write clear descriptions for LLM understanding
+
+### Tool Organization
+
+1. **Group related tools** - Use subdirectories for tool families
+2. **Reusable modules** - Extract common logic to shared utilities
+3. **Environment config** - Use environment variables for API keys
+4. **Testing** - Test tools independently before integration
+
+### Performance
+
+1. **Async by default** - Use async/await for I/O operations
+2. **Timeout handling** - Respect context.signal for cancellation
+3. **Resource cleanup** - Close files, connections, processes
+4. **Lazy loading** - Load dependencies only when needed
+
+## Related
+
+- [Skills System](/core/skills) - Reusable instruction workflows
+- [Custom Tools](/customization/custom-tools) - Authoring your own tools
+- [Tool API Reference](/tools/custom-tool-api) - Complete tool API documentation

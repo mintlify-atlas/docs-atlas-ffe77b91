@@ -1,0 +1,195 @@
+---
+title: "System Methods"
+description: "Core system operations for ping, shutdown, and state retrieval"
+---
+
+## system.ping
+
+Health check endpoint that returns the current server time.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"system.ping","params":{}}
+```
+
+### Parameters
+
+No parameters required.
+
+### Response
+
+<ResponseField name="ok" type="boolean" required>
+  Always returns `true`
+</ResponseField>
+
+<ResponseField name="time" type="string" required>
+  Current server time in ISO 8601 format
+</ResponseField>
+
+### Example
+
+```json
+{"jsonrpc":"2.0","id":1,"result":{"ok":true,"time":"2026-01-01T00:00:00.000Z"}}
+```
+
+---
+
+## system.shutdown
+
+Gracefully shutdown the loaf runtime server. Aborts all active sessions and clears queues.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"system.shutdown","params":{"reason":"client_disconnect"}}
+```
+
+### Parameters
+
+<ParamField path="reason" type="string">
+  Optional reason for shutdown (for logging/debugging)
+</ParamField>
+
+### Response
+
+<ResponseField name="accepted" type="boolean" required>
+  Always returns `true` if shutdown was initiated
+</ResponseField>
+
+<ResponseField name="reason" type="string">
+  The reason provided for shutdown
+</ResponseField>
+
+### Example
+
+```json
+{"jsonrpc":"2.0","id":2,"result":{"accepted":true,"reason":"client_disconnect"}}
+```
+
+---
+
+## state.get
+
+Retrieve the current runtime state snapshot including auth, model selection, sessions, and skills.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":3,"method":"state.get","params":{}}
+```
+
+### Parameters
+
+No parameters required.
+
+### Response
+
+<ResponseField name="auth" type="object" required>
+  Authentication state
+  
+  <ResponseField name="enabledProviders" type="array" required>
+    Array of enabled auth providers: `["openai", "openrouter", "antigravity"]`
+  </ResponseField>
+  
+  <ResponseField name="hasOpenAiToken" type="boolean" required>
+    Whether OpenAI OAuth token is configured
+  </ResponseField>
+  
+  <ResponseField name="hasOpenRouterKey" type="boolean" required>
+    Whether OpenRouter API key is configured
+  </ResponseField>
+  
+  <ResponseField name="hasAntigravityToken" type="boolean" required>
+    Whether Antigravity OAuth token is configured
+  </ResponseField>
+  
+  <ResponseField name="antigravityProfile" type="object">
+    Antigravity user profile (if authenticated)
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="onboarding" type="object" required>
+  <ResponseField name="completed" type="boolean" required>
+    Whether onboarding flow has been completed
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="model" type="object" required>
+  Model selection state
+  
+  <ResponseField name="selectedModel" type="string" required>
+    Currently selected model ID
+  </ResponseField>
+  
+  <ResponseField name="selectedThinking" type="string" required>
+    Selected thinking level: `"low"`, `"medium"`, `"high"`, or `"extended"`
+  </ResponseField>
+  
+  <ResponseField name="selectedOpenRouterProvider" type="string">
+    Selected OpenRouter provider (if using OpenRouter)
+  </ResponseField>
+  
+  <ResponseField name="selectedProvider" type="string" required>
+    Selected provider: `"openai"`, `"openrouter"`, or `"antigravity"`
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="sessions" type="object" required>
+  Active sessions summary
+  
+  <ResponseField name="count" type="number" required>
+    Number of active sessions
+  </ResponseField>
+  
+  <ResponseField name="ids" type="array" required>
+    Array of session IDs
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="skills" type="object" required>
+  Skills catalog summary
+  
+  <ResponseField name="count" type="number" required>
+    Number of available skills
+  </ResponseField>
+  
+  <ResponseField name="directories" type="array" required>
+    Skill directories being scanned
+  </ResponseField>
+</ResponseField>
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "auth": {
+      "enabledProviders": ["openai"],
+      "hasOpenAiToken": true,
+      "hasOpenRouterKey": false,
+      "hasAntigravityToken": false,
+      "antigravityProfile": null
+    },
+    "onboarding": {
+      "completed": true
+    },
+    "model": {
+      "selectedModel": "gpt-4o",
+      "selectedThinking": "medium",
+      "selectedOpenRouterProvider": null,
+      "selectedProvider": "openai"
+    },
+    "sessions": {
+      "count": 1,
+      "ids": ["550e8400-e29b-41d4-a716-446655440000"]
+    },
+    "skills": {
+      "count": 5,
+      "directories": ["/home/user/.config/loaf/skills"]
+    }
+  }
+}
+```

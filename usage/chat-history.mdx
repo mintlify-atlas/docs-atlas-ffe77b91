@@ -1,0 +1,189 @@
+---
+title: Chat History
+description: Session management, resuming chats, and history storage
+---
+
+loaf automatically saves your chat sessions to disk, allowing you to resume conversations at any time.
+
+## Session Storage
+
+Chat sessions are stored in **JSONL format** (one JSON object per line) in:
+
+```
+~/.loaf/sessions/YYYY/MM/DD/rollout-YYYYMMDD-HHMMSS<ms>-<uuid>.jsonl
+```
+
+### Directory Structure
+
+```
+~/.loaf/sessions/
+├── 2026/
+│   ├── 03/
+│   │   ├── 04/
+│   │   │   ├── rollout-20260304-143022123-abc123.jsonl
+│   │   │   └── rollout-20260304-151530456-def456.jsonl
+```
+
+Sessions are organized by UTC date for easy browsing and cleanup.
+
+## Session File Format
+
+Each session file contains:
+
+### Session Metadata (First Line)
+
+```json
+{
+  "type": "session_meta",
+  "id": "abc123-def456-...",
+  "title": "Fix TypeScript errors in auth module",
+  "provider": "openai",
+  "model": "gpt-4o",
+  "thinkingLevel": "MEDIUM",
+  "openRouterProvider": "anthropic",
+  "createdAt": "2026-03-04T14:30:22.123Z",
+  "updatedAt": "2026-03-04T14:35:45.678Z",
+  "messageCount": 8
+}
+```
+
+### Message Lines
+
+Each subsequent line represents a conversation message:
+
+```json
+{"type":"message","index":0,"role":"user","text":"Fix the type errors in src/auth.ts"}
+{"type":"message","index":1,"role":"assistant","text":"I'll help fix those..."}
+```
+
+<Note>
+Image attachments are stored inline in the message as base64 data URLs.
+</Note>
+
+## Resuming Sessions
+
+### Interactive Selector
+
+Use `/history` to open an interactive session picker:
+
+```bash
+/history
+```
+
+Sessions are sorted by most recent first. Use arrow keys to navigate and `Enter` to select.
+
+### Resume Latest Session
+
+```bash
+/history last
+```
+
+Resumes the most recently updated session.
+
+### Resume by Session ID
+
+```bash
+# Full UUID
+/history abc123-def456-789-...
+
+# ID prefix (must be unique)
+/history abc123
+```
+
+You can use a prefix of the session ID as long as it uniquely identifies one session.
+
+## Session Titles
+
+Session titles are automatically generated from:
+
+1. The first user message in the conversation
+2. Truncated to 80 characters max
+3. Falls back to "untitled chat" if no user messages exist
+
+Example:
+```
+"Fix TypeScript errors in auth module"
+"Implement user authentication with OAuth2"
+"Debug memory leak in event emitter..."
+```
+
+## Creating Sessions
+
+Sessions are created automatically when you:
+
+1. Start a new conversation (first message after launch)
+2. Use `/clear` (starts a new session)
+3. Resume an old session and send a new message
+
+Implementation reference: `src/chat-history.ts:51-74`
+
+## Writing Sessions
+
+loaf saves sessions:
+
+- **After every assistant response** - Ensures no data loss
+- **On graceful exit** - Final save before shutdown
+- **Atomic writes** - Uses `.tmp` file + rename for safety
+
+Implementation reference: `src/chat-history.ts:76-129`
+
+## Listing Sessions
+
+The session list is built by:
+
+1. Recursively scanning `~/.loaf/sessions/`
+2. Reading metadata from each `rollout-*.jsonl` file
+3. Sorting by `updatedAt` timestamp (most recent first)
+
+```typescript
+// From src/chat-history.ts:131-156
+const sessions = listChatSessions({ limit: 50 });
+```
+
+<Note>
+Only session metadata is loaded during listing. Full message history is loaded only when you resume a session.
+</Note>
+
+## Session Compatibility
+
+Sessions store:
+- Provider name (`openai`, `openrouter`, `antigravity`)
+- Model ID
+- Thinking level
+- OpenRouter provider preference (if applicable)
+
+When resuming, loaf will:
+- ✅ Load messages successfully even if the model is no longer available
+- ⚠️ Warn if the original provider isn't authenticated
+- 🔄 Allow you to continue with your currently selected model
+
+## Data Migration
+
+loaf automatically migrates session data from legacy locations:
+
+```
+# Old location (deprecated)
+$XDG_STATE_HOME/loaf/sessions/
+~/Library/Application Support/loaf/sessions/  # macOS
+
+# New location
+~/.loaf/sessions/
+```
+
+The migration happens automatically on first run.
+
+## Cleanup
+
+To remove old sessions:
+
+```bash
+# Remove sessions older than 30 days
+find ~/.loaf/sessions -name "rollout-*.jsonl" -mtime +30 -delete
+
+# Remove all sessions
+rm -rf ~/.loaf/sessions
+```
+
+<Warning>
+Deleting session files is permanent. There is no built-in recovery mechanism.
+</Warning>

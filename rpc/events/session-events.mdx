@@ -1,0 +1,259 @@
+---
+title: Session events
+description: Real-time events for AI conversations, streaming, and tool execution
+---
+
+Session events provide real-time updates during AI conversations, including streaming text, tool calls, and status changes.
+
+## session.status
+
+Emitted when the session status changes (thinking, processing, complete).
+
+```json
+{
+  "type": "session.status",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "session_id": "ses_abc123",
+    "pending": true,
+    "status_label": "thinking..."
+  }
+}
+```
+
+<ResponseField name="payload.session_id" type="string">
+  Unique session identifier
+</ResponseField>
+
+<ResponseField name="payload.pending" type="boolean">
+  Whether the session is actively processing
+</ResponseField>
+
+<ResponseField name="payload.status_label" type="string">
+  Human-readable status (e.g., "thinking...", "running tool", "complete")
+</ResponseField>
+
+## session.message.appended
+
+Emitted when a new message is added to the conversation history.
+
+```json
+{
+  "type": "session.message.appended",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "session_id": "ses_abc123",
+    "message": {
+      "role": "assistant",
+      "content": "I'll help you with that."
+    }
+  }
+}
+```
+
+<ResponseField name="payload.message.role" type="string">
+  Message role: `"user"`, `"assistant"`, or `"system"`
+</ResponseField>
+
+<ResponseField name="payload.message.content" type="string">
+  Message text content
+</ResponseField>
+
+## session.stream.chunk
+
+Emitted as the AI model streams text output.
+
+```json
+{
+  "type": "session.stream.chunk",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "session_id": "ses_abc123",
+    "text": "Hello",
+    "done": false
+  }
+}
+```
+
+<ResponseField name="payload.text" type="string">
+  Text chunk from the model. Append to build the full response.
+</ResponseField>
+
+<ResponseField name="payload.done" type="boolean">
+  Whether this is the final chunk in the stream
+</ResponseField>
+
+<Note>
+  Stream chunks arrive rapidly. Buffer them and update your UI incrementally.
+</Note>
+
+## session.tool.call.started
+
+Emitted when the AI begins executing a tool.
+
+```json
+{
+  "type": "session.tool.call.started",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "session_id": "ses_abc123",
+    "tool_call_id": "call_xyz789",
+    "tool_name": "bash",
+    "tool_input": {
+      "command": "ls -la"
+    }
+  }
+}
+```
+
+<ResponseField name="payload.tool_call_id" type="string">
+  Unique identifier for this tool execution
+</ResponseField>
+
+<ResponseField name="payload.tool_name" type="string">
+  Name of the tool being executed (e.g., `"bash"`, `"read_file"`)
+</ResponseField>
+
+<ResponseField name="payload.tool_input" type="object">
+  Input parameters passed to the tool
+</ResponseField>
+
+## session.tool.call.completed
+
+Emitted when a tool finishes executing.
+
+```json
+{
+  "type": "session.tool.call.completed",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "session_id": "ses_abc123",
+    "tool_call_id": "call_xyz789",
+    "tool_name": "bash",
+    "ok": true,
+    "duration_ms": 150
+  }
+}
+```
+
+<ResponseField name="payload.ok" type="boolean">
+  Whether the tool executed successfully
+</ResponseField>
+
+<ResponseField name="payload.duration_ms" type="number">
+  Tool execution time in milliseconds
+</ResponseField>
+
+## session.tool.results
+
+Emitted with the full results from tool execution.
+
+```json
+{
+  "type": "session.tool.results",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "session_id": "ses_abc123",
+    "results": [
+      {
+        "tool_call_id": "call_xyz789",
+        "tool_name": "bash",
+        "ok": true,
+        "output": {
+          "stdout": "total 24\ndrwxr-xr-x 5 user",
+          "exit_code": 0
+        }
+      }
+    ]
+  }
+}
+```
+
+<ResponseField name="payload.results" type="array">
+  Array of tool execution results. Each result includes:
+  - `tool_call_id` - Matches the ID from `tool.call.started`
+  - `tool_name` - Tool that was executed
+  - `ok` - Success status
+  - `output` - Tool-specific output object
+</ResponseField>
+
+## session.completed
+
+Emitted when the AI finishes its turn (all streaming and tool calls complete).
+
+```json
+{
+  "type": "session.completed",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "session_id": "ses_abc123",
+    "final_message": "I've listed the directory contents."
+  }
+}
+```
+
+<ResponseField name="payload.final_message" type="string">
+  The complete final message from the AI
+</ResponseField>
+
+<Info>
+  Use this event to know when to prompt the user for their next message.
+</Info>
+
+## session.interrupted
+
+Emitted when the user cancels an in-progress turn.
+
+```json
+{
+  "type": "session.interrupted",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "session_id": "ses_abc123",
+    "reason": "user_requested"
+  }
+}
+```
+
+## session.error
+
+Emitted when an error occurs during AI processing.
+
+```json
+{
+  "type": "session.error",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "session_id": "ses_abc123",
+    "error": "Rate limit exceeded",
+    "code": "rate_limit"
+  }
+}
+```
+
+<ResponseField name="payload.error" type="string">
+  Human-readable error message
+</ResponseField>
+
+<ResponseField name="payload.code" type="string">
+  Error code for programmatic handling
+</ResponseField>
+
+## Typical event sequence
+
+A normal conversation turn emits events in this order:
+
+1. `session.status` - Status changes to "thinking"
+2. `session.stream.chunk` - Multiple chunks as AI responds
+3. `session.tool.call.started` - If AI calls a tool
+4. `session.tool.call.completed` - Tool execution finishes
+5. `session.tool.results` - Tool results available
+6. `session.stream.chunk` - AI continues responding
+7. `session.completed` - Turn is complete
+8. `session.status` - Status changes to "idle"
+
+## Related
+
+- [Event system overview](/rpc/events/overview) - Event format and categories
+- [Session methods](/rpc/methods/session) - Creating and managing sessions
+- [RPC overview](/rpc/overview) - Protocol fundamentals

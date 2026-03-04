@@ -1,122 +1,114 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "loaf",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#8B6F47",
+    "light": "#C9A86A",
+    "dark": "#5C4A2F"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/veyzyn/loaf"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/veyzyn/loaf"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
               "index",
-              "quickstart",
-              "development"
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core/skills",
+              "core/tools",
+              "core/models",
+              "core/authentication"
+            ]
+          },
+          {
+            "group": "Usage",
+            "pages": [
+              "usage/commands",
+              "usage/chat-history",
+              "usage/image-attachments",
+              "usage/rpc-mode"
             ]
           },
           {
             "group": "Customization",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "customization/custom-tools",
+              "customization/creating-skills"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Tool Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Built-in Tools",
             "pages": [
-              "api-reference/introduction"
+              "tools/bash",
+              "tools/file-operations",
+              "tools/javascript",
+              "tools/web-search"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Tool Development",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "tools/custom-tool-api",
+              "tools/tool-runtime"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "RPC API",
+        "groups": [
+          {
+            "group": "Protocol",
+            "pages": [
+              "rpc/overview",
+              "rpc/authentication",
+              "rpc/handshake"
+            ]
+          },
+          {
+            "group": "Methods",
+            "pages": [
+              "rpc/methods/system",
+              "rpc/methods/session",
+              "rpc/methods/auth",
+              "rpc/methods/model"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "rpc/events/overview",
+              "rpc/events/session-events",
+              "rpc/events/auth-events"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

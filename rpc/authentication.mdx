@@ -1,0 +1,310 @@
+---
+title: Authentication
+description: OAuth flows in RPC mode with event-driven coordination
+---
+
+In RPC mode, loaf handles OAuth authentication flows via events rather than automatically opening browser windows. This allows headless integration and custom UI implementations.
+
+## OAuth Behavior in RPC Mode
+
+When `rpcMode: true` is set:
+- **No automatic browser opening**: The server emits URLs as events instead
+- **Event-driven flow**: Clients receive `auth.flow.*` events to coordinate authentication
+- **Device code support**: OpenAI supports both browser and device code flows
+
+## OpenAI OAuth
+
+### Initiating the Flow
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "auth.connect.openai",
+  "params": {
+    "mode": "browser",
+    "originator": "my-client"
+  }
+}
+```
+
+**Parameters**:
+- `mode` (optional): `"auto"` | `"browser"` | `"device_code"`
+  - `"auto"`: Server chooses best method
+  - `"browser"`: Browser-based OAuth
+  - `"device_code"`: Device code flow
+- `originator` (optional): Client identifier for tracking
+
+### Event Sequence (Browser Mode)
+
+**1. Flow Started**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "type": "auth.flow.started",
+    "timestamp": "2026-03-04T12:00:00.000Z",
+    "payload": {
+      "provider": "openai"
+    }
+  }
+}
+```
+
+**2. Browser URL Available**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "type": "auth.flow.url",
+    "timestamp": "2026-03-04T12:00:01.000Z",
+    "payload": {
+      "provider": "openai",
+      "url": "https://auth0.openai.com/authorize?..."
+    }
+  }
+}
+```
+
+<Note>
+Clients must open the URL in a browser or present it to the user. The server waits for the OAuth callback.
+</Note>
+
+**3. Flow Completed**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "type": "auth.flow.completed",
+    "timestamp": "2026-03-04T12:00:30.000Z",
+    "payload": {
+      "provider": "openai",
+      "login_method": "browser",
+      "account_id": "org-abc123"
+    }
+  }
+}
+```
+
+**Final Response**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "provider": "openai",
+    "login_method": "browser",
+    "account_id": "org-abc123"
+  }
+}
+```
+
+### Event Sequence (Device Code Mode)
+
+**1. Flow Started** (same as above)
+
+**2. Device Code Available**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "type": "auth.flow.device_code",
+    "timestamp": "2026-03-04T12:00:01.000Z",
+    "payload": {
+      "provider": "openai",
+      "verification_url": "https://auth0.openai.com/activate",
+      "user_code": "ABCD-1234",
+      "interval_seconds": 5,
+      "expires_in_seconds": 600
+    }
+  }
+}
+```
+
+<Info>
+Display the `user_code` and direct the user to visit `verification_url`. The server polls for completion automatically.
+</Info>
+
+**3. Flow Completed** (same as browser mode)
+
+### Error Handling
+
+If authentication fails:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "type": "auth.flow.failed",
+    "timestamp": "2026-03-04T12:00:30.000Z",
+    "payload": {
+      "provider": "openai",
+      "message": "User cancelled authorization"
+    }
+  }
+}
+```
+
+The original request will receive an error response:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32603,
+    "message": "User cancelled authorization",
+    "data": {
+      "reason": "internal_error"
+    }
+  }
+}
+```
+
+## Antigravity OAuth
+
+### Initiating the Flow
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "auth.connect.antigravity"
+}
+```
+
+No parameters required.
+
+### Event Sequence
+
+**1. Flow Started**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "type": "auth.flow.started",
+    "timestamp": "2026-03-04T12:01:00.000Z",
+    "payload": {
+      "provider": "antigravity"
+    }
+  }
+}
+```
+
+**2. Browser URL Available**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "type": "auth.flow.url",
+    "timestamp": "2026-03-04T12:01:01.000Z",
+    "payload": {
+      "provider": "antigravity",
+      "url": "https://api.anti-gravity.ai/oauth/authorize?..."
+    }
+  }
+}
+```
+
+**3. Flow Completed**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "type": "auth.flow.completed",
+    "timestamp": "2026-03-04T12:01:30.000Z",
+    "payload": {
+      "provider": "antigravity",
+      "profile": {
+        "email": "user@example.com",
+        "name": "User Name"
+      }
+    }
+  }
+}
+```
+
+## API Key Authentication
+
+For OpenRouter and Exa, use direct API key methods (no OAuth events):
+
+### OpenRouter
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "auth.set.openrouter_key",
+  "params": {
+    "api_key": "sk-or-..."
+  }
+}
+```
+
+### Exa
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "auth.set.exa_key",
+  "params": {
+    "api_key": "exa_..."
+  }
+}
+```
+
+## Checking Auth Status
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "auth.status"
+}
+```
+
+**Response**:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "openai": {
+      "connected": true,
+      "account_id": "org-abc123"
+    },
+    "antigravity": {
+      "connected": false
+    },
+    "openrouter": {
+      "connected": true,
+      "key_set": true
+    },
+    "exa": {
+      "connected": false
+    }
+  }
+}
+```
+
+## Implementation Details
+
+From `src/rpc/stdio-server.ts:18-19` and `src/core/runtime.ts:2414`:
+
+```typescript
+const runtime = await LoafCoreRuntime.create({ rpcMode: true });
+
+// When rpcMode is true:
+openBrowser: !this.rpcMode  // false in RPC mode
+```
+
+This prevents automatic browser opening and triggers event emission instead.

@@ -1,0 +1,371 @@
+---
+title: 'JavaScript Tools'
+description: 'Execute JavaScript code, install packages, and manage background JS processes'
+---
+
+## Overview
+
+The JavaScript tools allow you to run arbitrary JavaScript code, install packages, execute npm modules, and manage long-running background JavaScript processes.
+
+## Supported Runtimes
+
+- **Node.js** - Always available (uses `process.execPath`)
+- **Bun** - Automatically detected if installed
+- **Auto detection** - Prefers Bun if available, falls back to Node.js
+
+## Package Managers
+
+- **bun** - `bun add`, `bun x`
+- **pnpm** - `pnpm add`, `pnpm dlx`
+- **yarn** - `yarn add`, `yarn dlx`
+- **npm** - `npm install`, `npx`
+
+## run_js
+
+Run arbitrary JavaScript code in a local runtime (Node.js or Bun) and return stdout/stderr/exit details.
+
+### Parameters
+
+<ParamField path="code" type="string" required>
+  The full JavaScript code to execute.
+</ParamField>
+
+<ParamField path="args" type="array">
+  Optional argv passed to the script (accessible via `process.argv`).
+</ParamField>
+
+<ParamField path="cwd" type="string">
+  Optional working directory for script execution.
+</ParamField>
+
+<ParamField path="timeout_seconds" type="number" default="120">
+  Optional timeout in seconds (max 1200).
+</ParamField>
+
+<ParamField path="keep_script" type="boolean" default="false">
+  Keep generated script file on disk for debugging.
+</ParamField>
+
+<ParamField path="runtime" type="string" default="auto">
+  Runtime: `auto`, `node`, or `bun`.
+</ParamField>
+
+<ParamField path="format" type="string" default="module">
+  Script format: `module` (ESM) or `commonjs` (CJS).
+</ParamField>
+
+### Usage Examples
+
+```typescript
+// Simple execution
+await run_js({
+  code: `
+    console.log('Hello from Node.js');
+    console.log('Args:', process.argv.slice(2));
+  `,
+  args: ['foo', 'bar']
+});
+
+// Using ESM imports
+await run_js({
+  code: `
+    import { readFileSync } from 'fs';
+    const content = readFileSync('./package.json', 'utf8');
+    console.log(JSON.parse(content).name);
+  `,
+  format: 'module'
+});
+
+// Using Bun specifically
+await run_js({
+  code: `
+    console.log('Bun version:', Bun.version);
+  `,
+  runtime: 'bun'
+});
+```
+
+## install_js_packages
+
+Install JavaScript packages using available package managers.
+
+### Parameters
+
+<ParamField path="packages" type="array" required>
+  Package names to install (e.g., `["express", "lodash@4.17.21"]`).
+</ParamField>
+
+<ParamField path="args" type="array">
+  Extra package-manager-specific arguments.
+</ParamField>
+
+<ParamField path="dev" type="boolean" default="false">
+  Install as dev dependencies.
+</ParamField>
+
+<ParamField path="package_manager" type="string" default="auto">
+  Package manager: `auto`, `bun`, `pnpm`, `yarn`, or `npm`.
+</ParamField>
+
+<ParamField path="cwd" type="string">
+  Optional working directory.
+</ParamField>
+
+<ParamField path="timeout_seconds" type="number" default="120">
+  Optional timeout in seconds (max 1200).
+</ParamField>
+
+### Usage Examples
+
+```typescript
+// Install dependencies
+await install_js_packages({
+  packages: ['express', 'cors']
+});
+
+// Install dev dependencies with specific manager
+await install_js_packages({
+  packages: ['typescript', '@types/node'],
+  dev: true,
+  package_manager: 'pnpm'
+});
+
+// Install with extra flags
+await install_js_packages({
+  packages: ['react'],
+  args: ['--exact'],
+  package_manager: 'npm'
+});
+```
+
+## run_js_module
+
+Run a JavaScript module or binary with package-manager executors (bunx/pnpm dlx/yarn dlx/npx).
+
+### Parameters
+
+<ParamField path="module" type="string" required>
+  Module or package binary to run (e.g., `prettier`, `eslint`, `create-next-app`).
+</ParamField>
+
+<ParamField path="args" type="array">
+  Optional arguments passed to the module.
+</ParamField>
+
+<ParamField path="package_manager" type="string" default="auto">
+  Executor manager: `auto`, `bun`, `pnpm`, `yarn`, or `npm`.
+</ParamField>
+
+<ParamField path="cwd" type="string">
+  Optional working directory.
+</ParamField>
+
+<ParamField path="timeout_seconds" type="number" default="120">
+  Optional timeout in seconds (max 1200).
+</ParamField>
+
+### Usage Examples
+
+```typescript
+// Run prettier
+await run_js_module({
+  module: 'prettier',
+  args: ['--write', 'src/**/*.ts']
+});
+
+// Create a new project
+await run_js_module({
+  module: 'create-next-app',
+  args: ['my-app', '--typescript']
+});
+
+// Run with specific executor
+await run_js_module({
+  module: 'tsx',
+  args: ['script.ts'],
+  package_manager: 'pnpm'
+});
+```
+
+## Background JavaScript Execution
+
+### start_background_js
+
+Start a JavaScript script in the background and return a session ID for later interaction.
+
+#### Parameters
+
+<ParamField path="code" type="string" required>
+  Full JavaScript code to execute in the background.
+</ParamField>
+
+<ParamField path="args" type="array">
+  Optional argv passed to the script.
+</ParamField>
+
+<ParamField path="cwd" type="string">
+  Optional working directory for script execution.
+</ParamField>
+
+<ParamField path="keep_script" type="boolean" default="false">
+  Keep generated script file on disk after process exit.
+</ParamField>
+
+<ParamField path="runtime" type="string" default="auto">
+  Runtime: `auto`, `node`, or `bun`.
+</ParamField>
+
+<ParamField path="format" type="string" default="module">
+  Script format: `module` or `commonjs`.
+</ParamField>
+
+<ParamField path="session_name" type="string">
+  Optional friendly label for this background session.
+</ParamField>
+
+<ParamField path="reuse_session" type="boolean" default="true">
+  When true, reuse an existing running session with the same `session_name` and cwd.
+</ParamField>
+
+#### Usage Example
+
+```typescript
+const session = await start_background_js({
+  code: `
+    import express from 'express';
+    const app = express();
+    app.get('/', (req, res) => res.send('Hello'));
+    app.listen(3000, () => console.log('Server started'));
+  `,
+  session_name: 'express-server',
+  format: 'module'
+});
+
+console.log('Session ID:', session.session_id);
+```
+
+### read_background_js
+
+Read buffered stdout/stderr from a running or exited background JS session.
+
+#### Parameters
+
+<ParamField path="session_id" type="string" required>
+  Session ID returned by `start_background_js`.
+</ParamField>
+
+<ParamField path="max_chars" type="number" default="8000">
+  Max characters per stream to return (max 120000).
+</ParamField>
+
+<ParamField path="stream" type="string" default="both">
+  Stream selector: `both`, `stdout`, or `stderr`.
+</ParamField>
+
+<ParamField path="peek" type="boolean" default="false">
+  When true, do not advance the internal read cursor.
+</ParamField>
+
+#### Usage Example
+
+```typescript
+const output = await read_background_js({
+  session_id: 'bg-1234567890-abcd1234',
+  stream: 'stdout',
+  max_chars: 5000
+});
+
+console.log(output.stdout);
+console.log('Has more:', output.stdout_has_more);
+```
+
+### write_background_js
+
+Write input text to stdin of a running background JS session.
+
+#### Parameters
+
+<ParamField path="session_id" type="string" required>
+  Session ID returned by `start_background_js`.
+</ParamField>
+
+<ParamField path="input" type="string" required>
+  Text to write to stdin.
+</ParamField>
+
+<ParamField path="append_newline" type="boolean" default="true">
+  Append newline to input before writing.
+</ParamField>
+
+#### Usage Example
+
+```typescript
+await write_background_js({
+  session_id: 'bg-1234567890-abcd1234',
+  input: 'user input data'
+});
+```
+
+### stop_background_js
+
+Stop a background JS session.
+
+#### Parameters
+
+<ParamField path="session_id" type="string" required>
+  Session ID returned by `start_background_js`.
+</ParamField>
+
+<ParamField path="force" type="boolean" default="false">
+  When true, send SIGKILL. Default false (SIGTERM).
+</ParamField>
+
+#### Usage Example
+
+```typescript
+await stop_background_js({
+  session_id: 'bg-1234567890-abcd1234',
+  force: false
+});
+```
+
+### list_background_js
+
+List known background JS sessions and their state.
+
+#### Parameters
+
+<ParamField path="include_exited" type="boolean" default="false">
+  Include exited sessions.
+</ParamField>
+
+#### Usage Example
+
+```typescript
+const sessions = await list_background_js({
+  include_exited: true
+});
+
+console.log(`Found ${sessions.count} sessions`);
+sessions.sessions.forEach(s => {
+  console.log(`${s.session_name}: ${s.running ? 'running' : 'exited'}`);
+});
+```
+
+## Stream Management
+
+Background JavaScript sessions buffer output in circular buffers:
+
+- **Max buffer size**: 300,000 characters per stream
+- **Default read size**: 8,000 characters
+- **Max read size**: 120,000 characters
+- **Read cursor**: Tracks position in stream, only returns new data on subsequent reads
+- **Peek mode**: Read without advancing cursor
+
+## Session Reuse
+
+When `reuse_session: true` (default) and a `session_name` is provided, `start_background_js` will:
+
+1. Check for an existing running session with the same name and cwd
+2. Return the existing session ID instead of starting a new process
+3. Prevent duplicate processes when called multiple times

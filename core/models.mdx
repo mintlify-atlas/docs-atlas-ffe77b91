@@ -1,0 +1,407 @@
+---
+title: Model Selection
+description: Configure AI providers, select models, and manage thinking levels in loaf
+---
+
+## Overview
+
+Loaf supports multiple AI providers and models with dynamic discovery, caching, and flexible thinking level controls. You can switch between OpenAI, OpenRouter, and Antigravity providers with model-specific configurations.
+
+## Supported Providers
+
+```typescript
+type AuthProvider = "openrouter" | "openai" | "antigravity";
+```
+
+Loaf supports three authentication providers:
+
+- **OpenAI** - Direct OpenAI API with OAuth or API key
+- **OpenRouter** - Multi-provider routing service
+- **Antigravity** - Google Cloud-based AI platform
+
+## Model Discovery
+
+### Dynamic Model Lists
+
+Loaf fetches model catalogs from providers and caches them locally:
+
+```typescript
+export type ModelDiscoverySource = "remote" | "cache" | "fallback";
+
+export type ModelDiscoveryResult = {
+  models: ModelOption[];        // Available models
+  source: ModelDiscoverySource; // Where models came from
+};
+```
+
+### OpenAI Models
+
+```typescript
+import { discoverOpenAiModelOptions } from "./models.js";
+
+const result = await discoverOpenAiModelOptions({
+  accessToken: "your-access-token",
+  chatgptAccountId: "account-id",
+});
+
+console.log(`Found ${result.models.length} models`);
+console.log(`Source: ${result.source}`); // "remote" | "cache" | "fallback"
+```
+
+Discovery priority:
+1. **Remote catalog** - Fetch fresh model list from OpenAI
+2. **Fresh cache** - Use cached list if < 5 minutes old
+3. **Stale cache** - Use older cache if remote fails
+4. **Fallback** - Use hardcoded defaults if all else fails
+
+### OpenRouter Models
+
+```typescript
+import { discoverOpenRouterModelOptions } from "./models.js";
+
+const result = await discoverOpenRouterModelOptions({
+  apiKey: "your-openrouter-key",
+});
+```
+
+OpenRouter discovery follows the same priority as OpenAI.
+
+## Model Options
+
+### Model Metadata
+
+```typescript
+export type ModelOption = {
+  id: string;                   // Model identifier (e.g., "gpt-4o")
+  provider: AuthProvider;       // "openai" | "openrouter" | "antigravity"
+  displayProvider?: string;     // Optional display name
+  label: string;                // Human-readable name
+  description: string;          // Model description
+  supportedThinkingLevels?: ThinkingLevel[]; // Available reasoning levels
+  defaultThinkingLevel?: ThinkingLevel;      // Default reasoning level
+  routingProviders?: string[];  // OpenRouter: available backends
+  contextWindowTokens?: number; // Max context size
+};
+```
+
+### Model Identification
+
+Extract model names from IDs:
+
+```typescript
+import { modelIdToLabel, modelIdToSlug } from "./models.js";
+
+const label = modelIdToLabel("openai/gpt-4o");
+// => "gpt 4o"
+
+const slug = modelIdToSlug("openai/models/gpt-4o");
+// => "gpt-4o"
+```
+
+## Thinking Levels
+
+### Available Levels
+
+```typescript
+type ThinkingLevel = "OFF" | "MINIMAL" | "LOW" | "MEDIUM" | "HIGH" | "XHIGH";
+```
+
+Thinking levels control reasoning effort:
+
+- **OFF** - No extended reasoning
+- **MINIMAL** - Minimal reasoning
+- **LOW** - Light reasoning
+- **MEDIUM** - Moderate reasoning (typical default)
+- **HIGH** - Deep reasoning
+- **XHIGH** - Extra deep reasoning (Codex models only)
+
+### Model-Specific Levels
+
+Different models support different thinking levels:
+
+<CodeGroup>
+```typescript OpenAI Reasoning Models
+// GPT-5 and general reasoning models
+const OPENAI_REASONING_GENERAL: ThinkingLevel[] = [
+  "MINIMAL", "LOW", "MEDIUM", "HIGH"
+];
+
+// Codex and o-series models
+const OPENAI_REASONING_CODEX: ThinkingLevel[] = [
+  "LOW", "MEDIUM", "HIGH", "XHIGH"
+];
+
+// Codex mini models
+const OPENAI_REASONING_CODEX_MINI: ThinkingLevel[] = [
+  "MEDIUM", "HIGH"
+];
+```
+
+```typescript OpenRouter Models
+// Models with reasoning support
+const OPENROUTER_REASONING_ENABLED: ThinkingLevel[] = [
+  "OFF", "MINIMAL", "LOW", "MEDIUM", "HIGH"
+];
+
+// Models without reasoning
+const OPENROUTER_REASONING_DISABLED: ThinkingLevel[] = [
+  "OFF"
+];
+```
+</CodeGroup>
+
+Detection logic (src/models.ts:253):
+
+```typescript
+function normalizeOpenAiReasoningLevels(model: OpenAiCatalogModel, slug: string): ThinkingLevel[] {
+  // Check server-provided levels first
+  const fromServer = model.supportedReasoningLevels;
+  if (fromServer?.length > 0) {
+    return fromServer.map(mapOpenAiReasoningEffort);
+  }
+
+  // Fall back to model name patterns
+  const normalizedSlug = slug.toLowerCase();
+  if (normalizedSlug.includes("codex-mini")) {
+    return OPENAI_REASONING_CODEX_MINI;
+  }
+  if (normalizedSlug.includes("codex")) {
+    return OPENAI_REASONING_CODEX;
+  }
+  if (normalizedSlug.startsWith("gpt-5")) {
+    return OPENAI_REASONING_GENERAL;
+  }
+  return ["OFF", ...OPENAI_REASONING_GENERAL];
+}
+```
+
+### Default Thinking Level
+
+Loaf selects a default thinking level based on:
+
+1. Server-provided default (if available)
+2. Middle of supported range
+
+```typescript
+function normalizeDefaultThinkingLevel(
+  serverDefault: string | undefined,
+  supportedLevels: ThinkingLevel[]
+): ThinkingLevel | undefined {
+  const mapped = mapOpenAiReasoningEffort(serverDefault);
+  if (mapped && supportedLevels.includes(mapped)) {
+    return mapped;
+  }
+  // Use middle of range
+  return supportedLevels[Math.floor(Math.max(0, (supportedLevels.length - 1) / 2))];
+}
+```
+
+## Model Caching
+
+### Cache Storage
+
+Models are cached in `~/.loaf/models-cache.json`:
+
+```typescript
+type ModelsCacheFile = {
+  version: 1;
+  openai?: CachedProviderModels;
+  openrouter?: CachedProviderModels;
+  antigravity?: CachedProviderModels;
+};
+
+type CachedProviderModels = {
+  fetchedAt: string;  // ISO timestamp
+  models: Array<{     // Model metadata
+    id: string;
+    label: string;
+    description: string;
+    supportedThinkingLevels?: ThinkingLevel[];
+    defaultThinkingLevel?: ThinkingLevel;
+    routingProviders?: string[];
+    contextWindowTokens?: number;
+  }>;
+};
+```
+
+### Cache TTL
+
+```typescript
+const MODEL_CACHE_TTL_MS = 5 * 60 * 1_000; // 5 minutes
+```
+
+Cache is considered fresh for 5 minutes after fetch.
+
+### Reading from Cache
+
+```typescript
+import { readCachedProviderModels } from "./models.js";
+
+// Require fresh cache (< 5 min old)
+const fresh = readCachedProviderModels("openai", true);
+
+// Accept stale cache
+const stale = readCachedProviderModels("openai", false);
+```
+
+## Model Ranking
+
+OpenAI models are ranked by priority (src/models.ts:361):
+
+```typescript
+function openAiModelRank(modelId: string): number {
+  const normalized = modelId.trim().toLowerCase();
+  if (normalized.includes("codex")) return 0;     // Highest
+  if (normalized.startsWith("gpt-5")) return 1;
+  if (normalized.startsWith("gpt-4.1")) return 2;
+  if (normalized.startsWith("gpt-4o")) return 3;
+  if (normalized.startsWith("o")) return 4;
+  return 10;                                      // Lowest
+}
+```
+
+Models are sorted by:
+1. Server-provided priority (if available)
+2. Loaf's internal ranking
+3. Alphabetical order
+
+## Model Filtering
+
+### OpenAI Text Models
+
+Loaf filters for text-capable models (src/models.ts:323):
+
+```typescript
+function isLikelyOpenAiTextModel(modelId: string): boolean {
+  const normalized = modelId.trim().toLowerCase();
+  
+  // Include common text models
+  if (
+    normalized.startsWith("gpt-") ||
+    normalized.startsWith("o1") ||
+    normalized.startsWith("o3") ||
+    normalized.startsWith("o4") ||
+    normalized.includes("codex")
+  ) {
+    return true;
+  }
+
+  // Exclude non-text models
+  if (
+    normalized.includes("embedding") ||
+    normalized.includes("whisper") ||
+    normalized.includes("moderation") ||
+    normalized.includes("tts") ||
+    normalized.includes("dall")
+  ) {
+    return false;
+  }
+
+  return false;
+}
+```
+
+### Size Limits
+
+```typescript
+const MAX_OPENAI_MODELS = 120;
+```
+
+OpenAI model lists are capped at 120 models to prevent overwhelming UIs.
+
+## Provider Configuration
+
+Get default models for a provider:
+
+```typescript
+import { getDefaultModelOptionsForProvider } from "./models.js";
+
+const defaults = getDefaultModelOptionsForProvider("openai");
+// Returns array of fallback ModelOption objects
+```
+
+## Context Window Sizes
+
+Context window information is included when available:
+
+```typescript
+function normalizeContextWindowTokens(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+  const floored = Math.floor(value);
+  return floored > 0 ? floored : undefined;
+}
+```
+
+## Usage Examples
+
+### Check Model Capabilities
+
+```typescript
+const model = models.find(m => m.id === "gpt-4o");
+
+if (model) {
+  console.log(`Model: ${model.label}`);
+  console.log(`Provider: ${model.provider}`);
+  console.log(`Description: ${model.description}`);
+  
+  if (model.supportedThinkingLevels) {
+    console.log(`Thinking levels: ${model.supportedThinkingLevels.join(", ")}`);
+    console.log(`Default: ${model.defaultThinkingLevel}`);
+  }
+  
+  if (model.contextWindowTokens) {
+    console.log(`Context window: ${model.contextWindowTokens.toLocaleString()} tokens`);
+  }
+}
+```
+
+### Filter by Capability
+
+```typescript
+// Find models with high reasoning
+const highReasoningModels = models.filter(m => 
+  m.supportedThinkingLevels?.includes("HIGH") || 
+  m.supportedThinkingLevels?.includes("XHIGH")
+);
+
+// Find models with large context
+const largeContextModels = models.filter(m => 
+  m.contextWindowTokens && m.contextWindowTokens > 100_000
+);
+```
+
+## Best Practices
+
+### Model Selection
+
+1. **Check capabilities** - Verify model supports required thinking levels
+2. **Consider context** - Choose models with appropriate context windows
+3. **Test performance** - Different models excel at different tasks
+4. **Monitor costs** - Higher capability models may have higher costs
+
+### Caching Strategy
+
+1. **Accept stale cache** - Use for offline/degraded scenarios
+2. **Force refresh** - Require fresh data for critical operations
+3. **Handle failures** - Always provide fallback defaults
+
+### Provider Switching
+
+1. **Consistent interface** - All providers use same ModelOption format
+2. **Capability parity** - Check feature support per provider
+3. **Authentication** - Ensure credentials are configured for target provider
+
+## Source Code Reference
+
+- **`src/models.ts`** - Model discovery and management (src/models.ts:1)
+- **`src/config.ts`** - Provider and thinking level types (src/config.ts:1)
+- **`src/openai.ts`** - OpenAI catalog integration
+- **`src/openrouter.ts`** - OpenRouter model listing
+- **`src/antigravity.ts`** - Antigravity model support
+
+## Related
+
+- [Authentication](/core/authentication) - Configure provider credentials
+- [Slash Commands](/usage/commands) - Using /model command

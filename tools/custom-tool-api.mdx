@@ -1,0 +1,413 @@
+---
+title: 'Custom Tool API'
+description: 'Complete API reference for creating custom tools in loaf'
+---
+
+## Overview
+
+The loaf tool system allows you to extend the CLI with custom functionality through a well-defined API. Tools are JavaScript modules that export a specific structure conforming to the `ToolDefinition` interface.
+
+## Core Types
+
+### ToolDefinition
+
+The main interface that defines a tool's structure and behavior.
+
+```typescript
+type ToolDefinition<
+  TInput extends ToolInput = ToolInput,
+  TOutput extends JsonValue = JsonValue,
+> = {
+  name: string;
+  description: string;
+  inputSchema?: {
+    type: "object";
+    properties: Record<string, Record<string, unknown>>;
+    required?: string[];
+    additionalProperties?: boolean;
+  };
+  run: (input: TInput, context: ToolContext) => Promise<ToolResult<TOutput>> | ToolResult<TOutput>;
+};
+```
+
+<ParamField path="name" type="string" required>
+  Unique identifier for the tool. Must match pattern: `[a-zA-Z0-9_.:-]+`
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Human-readable description of what the tool does. Used for tool discovery and documentation.
+</ParamField>
+
+<ParamField path="inputSchema" type="object">
+  JSON Schema definition for tool input validation.
+  
+  <ParamField path="inputSchema.type" type="string" required>
+    Must be `"object"`
+  </ParamField>
+  
+  <ParamField path="inputSchema.properties" type="Record<string, object>" required>
+    Schema properties for each input parameter
+  </ParamField>
+  
+  <ParamField path="inputSchema.required" type="string[]">
+    Array of required parameter names
+  </ParamField>
+  
+  <ParamField path="inputSchema.additionalProperties" type="boolean">
+    Whether to allow properties not defined in the schema
+  </ParamField>
+</ParamField>
+
+<ParamField path="run" type="function" required>
+  The tool's execution function. Receives input and context, returns a result.
+  
+  **Signature:**
+  ```typescript
+  (input: TInput, context: ToolContext) => Promise<ToolResult<TOutput>> | ToolResult<TOutput>
+  ```
+</ParamField>
+
+### ToolInput
+
+Input parameters passed to a tool.
+
+```typescript
+type ToolInput = Record<string, JsonValue>;
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+type JsonPrimitive = string | number | boolean | null;
+```
+
+Tools receive input as a key-value object where all values must be JSON-serializable.
+
+### ToolResult
+
+The return type from a tool execution.
+
+```typescript
+type ToolResult<TOutput extends JsonValue = JsonValue> = {
+  ok: boolean;
+  output: TOutput;
+  error?: string;
+};
+```
+
+<ResponseField name="ok" type="boolean" required>
+  Indicates whether the tool executed successfully
+</ResponseField>
+
+<ResponseField name="output" type="JsonValue" required>
+  The tool's output data. Must be JSON-serializable.
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if `ok` is `false`
+</ResponseField>
+
+## Export Formats
+
+Loaf supports multiple export patterns for tool modules. Files must have extensions: `.js`, `.mjs`, or `.cjs`.
+
+### Direct Export
+
+Export the tool object directly:
+
+```javascript
+export const name = "my-tool";
+export const description = "Does something useful";
+
+export async function run(input, context) {
+  return {
+    ok: true,
+    output: { result: "success" }
+  };
+}
+```
+
+### Default Export
+
+Export as default object:
+
+```javascript
+export default {
+  name: "my-tool",
+  description: "Does something useful",
+  run: async (input, context) => {
+    return { ok: true, output: { result: "success" } };
+  }
+};
+```
+
+### Tool Property
+
+Nest the tool definition under a `tool` property:
+
+```javascript
+export const tool = {
+  name: "my-tool",
+  description: "Does something useful",
+  run: async (input, context) => {
+    return { ok: true, output: { result: "success" } };
+  }
+};
+```
+
+### Meta Export
+
+Separate metadata from implementation:
+
+```javascript
+export const meta = {
+  name: "my-tool",
+  description: "Does something useful",
+  args: {
+    type: "object",
+    properties: {
+      message: { type: "string" }
+    }
+  }
+};
+
+export async function run(input, context) {
+  return { ok: true, output: { result: input.message } };
+}
+```
+
+## Input Schema
+
+Define parameter schemas using JSON Schema format:
+
+```javascript
+export const inputSchema = {
+  type: "object",
+  properties: {
+    query: {
+      type: "string",
+      description: "Search query"
+    },
+    limit: {
+      type: "number",
+      description: "Maximum results",
+      default: 10
+    },
+    tags: {
+      type: "array",
+      items: { type: "string" }
+    }
+  },
+  required: ["query"],
+  additionalProperties: false
+};
+```
+
+<Note>
+You can use `args` as an alias for `inputSchema` in your exports.
+</Note>
+
+## Tool Registry
+
+The `ToolRegistry` class manages tool registration and lookup.
+
+### Methods
+
+<ParamField path="register(tool)" type="method">
+  Register a single tool. Throws if the tool name already exists.
+  
+  ```typescript
+  register(tool: ToolDefinition): this
+  ```
+</ParamField>
+
+<ParamField path="registerMany(tools)" type="method">
+  Register multiple tools at once.
+  
+  ```typescript
+  registerMany(tools: ToolDefinition[]): this
+  ```
+</ParamField>
+
+<ParamField path="get(name)" type="method">
+  Retrieve a tool by name.
+  
+  ```typescript
+  get(name: string): ToolDefinition | undefined
+  ```
+</ParamField>
+
+<ParamField path="has(name)" type="method">
+  Check if a tool is registered.
+  
+  ```typescript
+  has(name: string): boolean
+  ```
+</ParamField>
+
+<ParamField path="unregister(name)" type="method">
+  Remove a tool from the registry.
+  
+  ```typescript
+  unregister(name: string): this
+  ```
+</ParamField>
+
+<ParamField path="list()" type="method">
+  Get all registered tools, sorted alphabetically by name.
+  
+  ```typescript
+  list(): ToolDefinition[]
+  ```
+</ParamField>
+
+<ParamField path="getModelManifest()" type="method">
+  Get tool metadata for AI model consumption.
+  
+  ```typescript
+  getModelManifest(): Array<{
+    name: string;
+    description: string;
+    inputSchema?: ToolDefinition["inputSchema"];
+  }>
+  ```
+</ParamField>
+
+### Usage Example
+
+```typescript
+import { createToolRegistry } from "loaf/tools";
+
+const registry = createToolRegistry();
+
+registry.register({
+  name: "hello",
+  description: "Greets the user",
+  run: async () => ({ ok: true, output: "Hello!" })
+});
+
+const tool = registry.get("hello");
+if (tool) {
+  const result = await tool.run({}, { now: new Date() });
+  console.log(result.output); // "Hello!"
+}
+```
+
+## Tool Discovery
+
+Loaf automatically discovers custom tools from the tools directory.
+
+### Discovery Process
+
+```typescript
+import { discoverCustomTools } from "loaf/tools";
+
+const result = await discoverCustomTools();
+
+result.searchedDirectories; // Directories searched
+result.loaded;              // Successfully loaded tools
+result.errors;              // Any loading errors
+```
+
+<ResponseField name="searchedDirectories" type="string[]">
+  List of directories that were searched for tools
+</ResponseField>
+
+<ResponseField name="loaded" type="array">
+  Array of successfully loaded tools
+  
+  <ResponseField name="loaded[].name" type="string">
+    Tool name
+  </ResponseField>
+  
+  <ResponseField name="loaded[].sourcePath" type="string">
+    Absolute path to the tool file
+  </ResponseField>
+  
+  <ResponseField name="loaded[].tool" type="ToolDefinition">
+    The tool definition object
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="errors" type="string[]">
+  Error messages for tools that failed to load
+</ResponseField>
+
+### Custom Tools Directory
+
+Tools are loaded from:
+
+```typescript
+import { getCustomToolsDirectory } from "loaf/tools";
+
+const toolsDir = getCustomToolsDirectory();
+// Returns: <loaf-data-dir>/tools
+```
+
+<Note>
+The `node_modules` directory is automatically excluded from tool discovery.
+</Note>
+
+## Loading Individual Tools
+
+You can load a single tool file programmatically:
+
+```typescript
+import { loadCustomToolFile } from "loaf/tools";
+
+const loaded = await loadCustomToolFile("/path/to/my-tool.js");
+
+if (loaded) {
+  console.log(loaded.name);       // Tool name
+  console.log(loaded.sourcePath); // File path
+  console.log(loaded.tool);       // ToolDefinition
+}
+```
+
+Returns `null` if:
+- File extension is not supported
+- No valid tool export is found
+
+Throws if:
+- Tool name is invalid
+- Module fails to load
+
+## Validation
+
+### Tool Name Validation
+
+Tool names must match the pattern: `[a-zA-Z0-9_.:-]+`
+
+```typescript
+import { isValidCustomToolName } from "loaf/tools";
+
+isValidCustomToolName("my-tool");     // true
+isValidCustomToolName("my_tool");     // true
+isValidCustomToolName("my.tool");     // true
+isValidCustomToolName("my:tool");     // true
+isValidCustomToolName("my tool");     // false (spaces not allowed)
+isValidCustomToolName("my/tool");     // false (slashes not allowed)
+```
+
+### Result Normalization
+
+Tools can return simplified values that are automatically normalized:
+
+```javascript
+// Simple value
+export async function run(input, context) {
+  return "Hello";
+}
+// Normalized to: { ok: true, output: "Hello" }
+
+// Explicit result
+export async function run(input, context) {
+  return { ok: true, output: "Hello" };
+}
+// Used as-is
+
+// Error result
+export async function run(input, context) {
+  return { ok: false, output: null, error: "Something went wrong" };
+}
+```
+
+<Warning>
+All output values must be JSON-serializable. Non-serializable values (functions, symbols, etc.) will be converted to strings.
+</Warning>

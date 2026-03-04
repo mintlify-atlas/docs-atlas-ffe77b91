@@ -1,80 +1,358 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with loaf in minutes — authenticate, choose a model, and run your first AI-powered commands
 ---
 
-## Get started in three steps
+This guide walks you through your first loaf session, from authentication to running commands.
 
-Get your documentation site running locally and make your first customization.
+## Before you start
 
-### Step 1: Set up your local environment
+Make sure you've completed the [Installation](/installation) steps:
+
+- Node.js `>=20` installed
+- Repository cloned and dependencies installed with `npm install`
+
+## Launch loaf
+
+Start loaf in TUI mode:
+
+```bash
+cd loaf
+npm run dev
+```
+
+On first launch, you'll see the onboarding flow.
+
+## Onboarding flow
+
+loaf guides you through a two-step setup:
+
+<Steps>
+  <Step title="Connect an AI provider">
+    loaf supports multiple AI providers. Choose one to authenticate:
+
+    <Tabs>
+      <Tab title="OpenAI">
+        **Best for**: ChatGPT models (GPT-4, o1, o3)
+
+        1. Select **OpenAI** from the onboarding menu
+        2. loaf opens a browser window for OAuth login
+        3. Sign in with your OpenAI account
+        4. Grant access when prompted
+        5. Return to the terminal — authentication is complete
+
+        <Note>
+          loaf uses OpenAI's OAuth flow. Your credentials are stored securely in your system keychain.
+        </Note>
+      </Tab>
+
+      <Tab title="OpenRouter">
+        **Best for**: Access to 200+ models from multiple providers
+
+        1. Select **OpenRouter** from the onboarding menu
+        2. Enter your OpenRouter API key when prompted
+        3. Press Enter to save
+
+        <Note>
+          Get your API key at [openrouter.ai/keys](https://openrouter.ai/keys). Free tier available.
+        </Note>
+      </Tab>
+
+      <Tab title="Antigravity">
+        **Best for**: Additional model access via Antigravity OAuth
+
+        1. Select **Antigravity** from the onboarding menu
+        2. loaf opens a browser window for OAuth login
+        3. Sign in with your Antigravity account
+        4. Grant access when prompted
+        5. Return to the terminal — authentication is complete
+
+        <Note>
+          Antigravity provides access to OpenAI models through its platform.
+        </Note>
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Configure web search (optional)">
+    loaf can perform web searches using the Exa API.
+
+    **Option 1: Add Exa API key**
+
+    1. Enter your Exa API key when prompted
+    2. Press Enter to save
+    3. The `search_web` tool is now available
+
+    **Option 2: Skip**
+
+    Type `skip` and press Enter. You can add the key later with `/auth`.
+
+    <Note>
+      Get a free Exa API key at [exa.ai](https://exa.ai). The free tier includes 1,000 searches/month.
+    </Note>
+  </Step>
+</Steps>
+
+After onboarding, loaf is ready to use.
+
+## Choose a model
+
+Before your first prompt, select an AI model:
+
+<Steps>
+  <Step title="Open the model selector">
+    Type `/model` and press Enter.
+
+    You'll see a list of available models based on your connected providers.
+  </Step>
+
+  <Step title="Select a model">
+    Use arrow keys to navigate:
+
+    - **↑/↓**: Move through the list
+    - **Enter**: Select a model
+    - **Type to search**: Filter models by name
+
+    <CodeGroup>
+      ```bash OpenAI models
+      gpt-4.1        # GPT-4 Turbo (latest)
+      o1-preview     # OpenAI o1 reasoning model
+      o3-mini        # Fast reasoning model
+      ```
+
+      ```bash OpenRouter models
+      anthropic/claude-3.5-sonnet    # Claude 3.5 Sonnet
+      google/gemini-pro-1.5          # Gemini 1.5 Pro
+      meta-llama/llama-3.1-405b      # Llama 3.1 405B
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Configure thinking level">
+    For reasoning models (o1, o3), loaf prompts you to select a thinking level:
+
+    - **OFF**: No extended reasoning (fastest)
+    - **MINIMAL**: Very light reasoning
+    - **LOW**: Fast with lighter reasoning
+    - **MEDIUM**: Balanced depth and speed
+    - **HIGH**: Maximum reasoning depth
+    - **XHIGH**: Extra high reasoning (for hardest tasks)
+
+    <Note>
+      Thinking level controls reasoning effort for extended-reasoning models. For standard models, it's ignored.
+    </Note>
+  </Step>
+</Steps>
+
+Your model selection is saved. You can change it anytime with `/model`.
+
+## Your first commands
+
+<Steps>
+  <Step title="Send a message">
+    Type a message at the prompt and press Enter:
+
+    ```
+    > explain how loaf works
+    ```
+
+    loaf sends your message to the selected model and streams the response.
+  </Step>
+
+  <Step title="Execute a tool">
+    Ask loaf to perform an action:
+
+    ```
+    > list files in the current directory
+    ```
+
+    loaf calls the `bash` tool to run `ls` and shows you the output.
+
+    <Note>
+      loaf has built-in tools for shell commands, file operations, JavaScript execution, and web search. See [Tools](/core/tools) for details.
+    </Note>
+  </Step>
+
+  <Step title="Read and edit files">
+    loaf can read and modify files:
+
+    ```
+    > read package.json and show me the dependencies
+    ```
+
+    Or make changes:
+
+    ```
+    > update the version to 0.3.0 in package.json
+    ```
+
+    loaf uses the `read_file` and `apply_patch` tools to inspect and edit files.
+  </Step>
+
+  <Step title="Run code">
+    Execute JavaScript directly:
+
+    ```
+    > calculate the fibonacci sequence up to 10 terms
+    ```
+
+    loaf uses the `run_js` tool to execute code and return results.
+  </Step>
+</Steps>
+
+## Essential commands
+
+loaf includes slash commands for common operations:
 
 <AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
+  <Accordion title="/help — Show all commands">
+    Displays a list of all available slash commands.
+
+    ```
+    > /help
+    ```
   </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
+
+  <Accordion title="/model — Change model">
+    Opens the model selector to switch AI models or adjust thinking levels.
+
+    ```
+    > /model
+    ```
+  </Accordion>
+
+  <Accordion title="/auth — Manage providers">
+    Add or update authentication for AI providers.
+
+    ```
+    > /auth
+    ```
+  </Accordion>
+
+  <Accordion title="/history — Resume chats">
+    Load a previous chat session:
+
+    ```bash
+    /history        # Browse all sessions
+    /history last   # Load most recent session
+    /history <id>   # Load specific session by ID
+    ```
+  </Accordion>
+
+  <Accordion title="/clear — Clear conversation">
+    Clears the current conversation history to start fresh.
+
+    ```
+    > /clear
+    ```
+  </Accordion>
+
+  <Accordion title="/tools — List tools">
+    Shows all registered tools (built-in and custom).
+
+    ```
+    > /tools
+    ```
+  </Accordion>
+
+  <Accordion title="/skills — List skills">
+    Displays available skills from:
+    - Repository `.agents/skills`
+    - User directory `~/.loaf/skills`
+    - Global directory `~/.agents/skills`
+
+    ```
+    > /skills
+    ```
+
+    Use skills with `$skill-name` syntax in your messages.
+  </Accordion>
+
+  <Accordion title="/onboarding — Re-run setup">
+    Re-runs the onboarding flow to reconfigure providers.
+
+    ```
+    > /onboarding
+    ```
+  </Accordion>
+
+  <Accordion title="/quit or /exit — Exit loaf">
+    Exits the loaf TUI.
+
+    ```
+    > /quit
+    ```
+
+    Or press `Ctrl+C` (or `Cmd+C` on macOS).
   </Accordion>
 </AccordionGroup>
 
-### Step 2: Deploy your changes
+## Using skills
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+Skills are reusable instruction bundles. To use a skill, mention it with the `$` prefix:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+```
+> $code-review analyze this file for potential bugs
+```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+loaf loads the skill's instructions and applies them to your request.
 
-### Step 3: Go live
+See [Skills](/core/skills) for more details.
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Interrupting and steering
+
+### Interrupt active inference
+
+Press `Ctrl+C` (or `Cmd+C` on macOS) while loaf is generating a response to interrupt it.
+
+### Steer during inference
+
+Type a message while loaf is working to queue a steering message. loaf processes it after the current inference completes.
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `↑` / `↓` | Navigate command history |
+| `Ctrl+C` / `Cmd+C` | Interrupt inference or exit |
+| `Tab` | Autocomplete slash commands |
+| `Ctrl+V` / `Cmd+V` | Paste clipboard content (including images) |
+
+## Configuration files
+
+loaf stores state in `~/.loaf` (or `%USERPROFILE%\.loaf` on Windows):
+
+- **auth.json**: OAuth tokens and API keys
+- **state.json**: Model selection, thinking level, input history
+- **chat-sessions/**: Saved chat sessions
+
+### Reset configuration
+
+To wipe all local config and restart onboarding:
+
+```
+> /forgeteverything
+```
+
+<Warning>
+  This deletes all authentication, settings, and chat history. Use with caution.
+</Warning>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Now that you're up and running, explore more:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Core concepts" icon="book" href="/core/skills">
+    Learn about skills, tools, and models
+  </Card>
+  <Card title="Commands" icon="terminal" href="/usage/commands">
+    Master all slash commands
+  </Card>
+  <Card title="Custom tools" icon="wrench" href="/customization/custom-tools">
+    Extend loaf with your own JavaScript tools
+  </Card>
+  <Card title="RPC mode" icon="plug" href="/usage/rpc-mode">
+    Integrate loaf programmatically
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

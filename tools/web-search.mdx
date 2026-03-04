@@ -1,0 +1,206 @@
+---
+title: 'Web Search'
+description: 'Search the web with Exa AI and get answer-ready results'
+---
+
+## Overview
+
+The `search_web` tool provides web search functionality powered by Exa AI, returning structured results with URLs, titles, highlights, and optional text content.
+
+## Setup
+
+An Exa API key is required to use this tool. Run `/onboarding` in loaf to configure your API key.
+
+## search_web
+
+Search the web with Exa and return answer-ready results with URLs and highlights.
+
+### Parameters
+
+<ParamField path="query" type="string" required>
+  Search query text.
+</ParamField>
+
+<ParamField path="type" type="string" default="auto">
+  Exa search mode:
+  - `auto` - Automatically select best mode
+  - `fast` - Quick keyword search
+  - `neural` - AI-powered semantic search
+  - `deep` - Most thorough semantic search
+</ParamField>
+
+<ParamField path="num_results" type="number" default="8">
+  Number of results to return (1-25).
+</ParamField>
+
+<ParamField path="include_text" type="boolean" default="false">
+  Include crawled text snippets in result rows when available.
+</ParamField>
+
+<ParamField path="include_highlights" type="boolean" default="true">
+  Include Exa highlights (enabled by default).
+</ParamField>
+
+<ParamField path="highlight_query" type="string">
+  Optional query used specifically for highlight extraction. Defaults to the main query.
+</ParamField>
+
+<ParamField path="highlight_sentences" type="number" default="2">
+  Number of sentences per highlight snippet (1-8).
+</ParamField>
+
+<ParamField path="highlights_per_url" type="number" default="3">
+  How many highlight snippets per URL (1-8).
+</ParamField>
+
+<ParamField path="include_domains" type="array">
+  Optional domain allowlist (e.g., `["github.com", "docs.python.org"]`).
+</ParamField>
+
+<ParamField path="exclude_domains" type="array">
+  Optional domain denylist (e.g., `["example.com"]`).
+</ParamField>
+
+### Usage Examples
+
+```typescript
+// Simple search
+await search_web({
+  query: "TypeScript async patterns"
+});
+
+// Neural search with more results
+await search_web({
+  query: "best practices for React hooks",
+  type: "neural",
+  num_results: 15
+});
+
+// Search with domain filtering
+await search_web({
+  query: "machine learning tutorials",
+  include_domains: ["github.com", "arxiv.org"],
+  num_results: 10
+});
+
+// Search with full text content
+await search_web({
+  query: "Next.js 14 features",
+  include_text: true,
+  include_highlights: true,
+  highlight_sentences: 3
+});
+```
+
+### Result Format
+
+Each result includes:
+
+```typescript
+{
+  title: string;           // Page title
+  url: string;             // Page URL
+  score?: number;          // Relevance score
+  author?: string;         // Page author if available
+  published_date?: string; // Publication date if available
+  text?: string;           // Crawled text content (if include_text: true)
+  highlights?: string[];   // Highlight snippets (if include_highlights: true)
+  highlight_scores?: number[]; // Relevance scores for each highlight
+}
+```
+
+### Search Modes
+
+#### auto (default)
+Automatically selects the best search mode based on your query.
+
+#### fast
+Quick keyword-based search. Best for:
+- Specific terms or phrases
+- Known entities
+- Fast results
+
+#### neural
+AI-powered semantic search. Best for:
+- Conceptual queries
+- Natural language questions
+- Related content discovery
+
+#### deep
+Most thorough semantic search. Best for:
+- Complex research queries
+- Comprehensive results
+- When quality matters more than speed
+
+### Highlights
+
+Highlights are the most relevant excerpts from each page, extracted by Exa's AI:
+
+- Automatically identifies key passages that answer your query
+- Configurable snippet length (`highlight_sentences`)
+- Multiple highlights per URL (`highlights_per_url`)
+- Optional separate highlight query for refined extraction
+
+```typescript
+// Use different query for highlights
+await search_web({
+  query: "TypeScript",
+  highlight_query: "TypeScript benefits advantages",
+  highlights_per_url: 5
+});
+```
+
+### Domain Filtering
+
+Control which domains are included or excluded:
+
+```typescript
+// Only search specific domains
+await search_web({
+  query: "API documentation",
+  include_domains: [
+    "docs.microsoft.com",
+    "developer.mozilla.org",
+    "nodejs.org"
+  ]
+});
+
+// Exclude specific domains
+await search_web({
+  query: "programming tutorials",
+  exclude_domains: [
+    "stackoverflow.com",
+    "reddit.com"
+  ]
+});
+```
+
+### Text Content
+
+When `include_text: true`, results include crawled page content:
+
+- Full text snippets from the page (up to 2000 characters)
+- Useful for direct content analysis
+- Combined with highlights for comprehensive context
+
+```typescript
+await search_web({
+  query: "React Server Components",
+  include_text: true,
+  include_highlights: true,
+  num_results: 5
+});
+```
+
+### Rate Limits and Quotas
+
+The search_web tool is subject to Exa API rate limits and quotas based on your API plan. Check your Exa dashboard for current limits.
+
+### Error Handling
+
+The tool returns an error if:
+- No API key is configured
+- The query is empty
+- Exa API returns an error (rate limit, invalid key, etc.)
+
+Configure your API key by running `/onboarding` in loaf.

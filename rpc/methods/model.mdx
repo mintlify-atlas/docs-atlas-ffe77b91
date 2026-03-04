@@ -1,0 +1,365 @@
+---
+title: "Model Methods"
+description: "List available models, select models, and manage model providers"
+---
+
+## model.list
+
+List available models across all enabled providers or filter by a specific provider.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"model.list","params":{}}
+```
+
+### Parameters
+
+<ParamField path="provider" type="string">
+  Optional provider filter: `"openai"`, `"openrouter"`, or `"antigravity"`
+</ParamField>
+
+### Response
+
+<ResponseField name="providers" type="array" required>
+  Array of enabled provider names
+</ResponseField>
+
+<ResponseField name="models" type="array" required>
+  Array of available model objects. Each model includes:
+  - `id` - Model identifier
+  - `name` - Display name
+  - `provider` - Provider name
+  - `thinking_levels` - Supported thinking levels
+  - Additional provider-specific metadata
+</ResponseField>
+
+<ResponseField name="selected_model" type="string" required>
+  Currently selected model ID
+</ResponseField>
+
+<ResponseField name="selected_thinking" type="string" required>
+  Currently selected thinking level: `"low"`, `"medium"`, `"high"`, or `"extended"`
+</ResponseField>
+
+<ResponseField name="selected_provider" type="string" required>
+  Currently selected provider
+</ResponseField>
+
+<ResponseField name="selected_openrouter_provider" type="string">
+  Selected OpenRouter provider (if using OpenRouter)
+</ResponseField>
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "providers": ["openai", "openrouter"],
+    "models": [
+      {
+        "id": "gpt-4o",
+        "name": "GPT-4o",
+        "provider": "openai",
+        "thinking_levels": ["low", "medium", "high"],
+        "context_window": 128000
+      },
+      {
+        "id": "anthropic/claude-3.5-sonnet",
+        "name": "Claude 3.5 Sonnet",
+        "provider": "openrouter",
+        "thinking_levels": ["low", "medium", "high"],
+        "context_window": 200000
+      }
+    ],
+    "selected_model": "gpt-4o",
+    "selected_thinking": "medium",
+    "selected_provider": "openai",
+    "selected_openrouter_provider": null
+  }
+}
+```
+
+---
+
+## model.select
+
+Select a model and thinking level for future conversations. Optionally compress an existing session.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"model.select","params":{"model_id":"gpt-4o","provider":"openai","thinking_level":"high"}}
+```
+
+### Parameters
+
+<ParamField path="model_id" type="string" required>
+  Model identifier (must exist in the provider's catalog)
+</ParamField>
+
+<ParamField path="provider" type="string" required>
+  Provider name: `"openai"`, `"openrouter"`, or `"antigravity"`
+</ParamField>
+
+<ParamField path="thinking_level" type="string" required>
+  Thinking level: `"low"`, `"medium"`, `"high"`, or `"extended"`
+</ParamField>
+
+<ParamField path="openrouter_provider" type="string">
+  OpenRouter routing provider (only for OpenRouter models)
+</ParamField>
+
+<ParamField path="session_id" type="string">
+  Session ID to compress (required if `compress_immediately` is true)
+</ParamField>
+
+<ParamField path="compress_immediately" type="boolean" default={false}>
+  If true, compress the specified session's history to fit the new model's context window
+</ParamField>
+
+### Response
+
+<ResponseField name="selected_model" type="string" required>
+  The selected model ID
+</ResponseField>
+
+<ResponseField name="selected_provider" type="string" required>
+  The selected provider
+</ResponseField>
+
+<ResponseField name="selected_thinking" type="string" required>
+  The selected thinking level (may be normalized for the model)
+</ResponseField>
+
+<ResponseField name="selected_openrouter_provider" type="string">
+  The selected OpenRouter provider (if applicable)
+</ResponseField>
+
+<ResponseField name="compression" type="object">
+  Compression details (if `compress_immediately` was true)
+  
+  <ResponseField name="requested" type="boolean" required>
+    Whether compression was requested
+  </ResponseField>
+  
+  <ResponseField name="applied" type="boolean" required>
+    Whether compression was actually applied
+  </ResponseField>
+  
+  <ResponseField name="reason" type="string" required>
+    Reason: `"none"`, `"auto"`, or `"provider_switch"`
+  </ResponseField>
+  
+  <ResponseField name="estimated_tokens_before" type="number" required>
+    Token count before compression
+  </ResponseField>
+  
+  <ResponseField name="estimated_tokens_after" type="number" required>
+    Token count after compression
+  </ResponseField>
+  
+  <ResponseField name="model_context_window" type="number" required>
+    Model's context window size
+  </ResponseField>
+  
+  <ResponseField name="target_limit" type="number" required>
+    Target token limit for compression
+  </ResponseField>
+  
+  <ResponseField name="anchor_event_index_before" type="number" required>
+    History anchor index before compression
+  </ResponseField>
+  
+  <ResponseField name="anchor_event_index_after" type="number" required>
+    History anchor index after compression
+  </ResponseField>
+</ResponseField>
+
+### Example (Basic)
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "selected_model": "gpt-4o",
+    "selected_provider": "openai",
+    "selected_thinking": "high",
+    "selected_openrouter_provider": null,
+    "compression": null
+  }
+}
+```
+
+### Example (With Compression)
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "model.select",
+  "params": {
+    "model_id": "anthropic/claude-3.5-sonnet",
+    "provider": "openrouter",
+    "thinking_level": "medium",
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "compress_immediately": true
+  }
+}
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "selected_model": "anthropic/claude-3.5-sonnet",
+    "selected_provider": "openrouter",
+    "selected_thinking": "medium",
+    "selected_openrouter_provider": "any",
+    "compression": {
+      "requested": true,
+      "applied": true,
+      "reason": "provider_switch",
+      "estimated_tokens_before": 45000,
+      "estimated_tokens_after": 12000,
+      "model_context_window": 200000,
+      "target_limit": 160000,
+      "anchor_event_index_before": 42,
+      "anchor_event_index_after": 38
+    }
+  }
+}
+```
+
+<Info>
+Thinking levels may be automatically adjusted based on model capabilities. For example, if a model doesn't support `"extended"` thinking, it will be normalized to `"high"`.
+</Info>
+
+---
+
+## model.openrouter.providers
+
+List available routing providers for a specific OpenRouter model.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":4,"method":"model.openrouter.providers","params":{"model_id":"anthropic/claude-3.5-sonnet"}}
+```
+
+### Parameters
+
+<ParamField path="model_id" type="string" required>
+  OpenRouter model ID
+</ParamField>
+
+### Response
+
+<ResponseField name="model_id" type="string" required>
+  The model ID
+</ResponseField>
+
+<ResponseField name="providers" type="array" required>
+  Array of provider names available for this model
+</ResponseField>
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "result": {
+    "model_id": "anthropic/claude-3.5-sonnet",
+    "providers": ["anthropic", "aws", "gcp"]
+  }
+}
+```
+
+<Note>
+This method requires an OpenRouter API key to be configured via `auth.set.openrouter_key`.
+</Note>
+
+---
+
+## limits.get
+
+Retrieve usage limits and quotas from OAuth providers (OpenAI and Antigravity).
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":5,"method":"limits.get","params":{}}
+```
+
+### Parameters
+
+No parameters required.
+
+### Response
+
+<ResponseField name="openai" type="object">
+  OpenAI usage snapshot (if authenticated)
+  
+  <ResponseField name="ok" type="boolean" required>
+    Whether the request succeeded
+  </ResponseField>
+  
+  <ResponseField name="snapshot" type="object">
+    Usage snapshot object (if ok=true)
+  </ResponseField>
+  
+  <ResponseField name="message" type="string">
+    Error message (if ok=false)
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="antigravity" type="object">
+  Antigravity usage snapshot (if authenticated)
+  
+  <ResponseField name="ok" type="boolean" required>
+    Whether the request succeeded
+  </ResponseField>
+  
+  <ResponseField name="snapshot" type="object">
+    Usage snapshot object (if ok=true)
+  </ResponseField>
+  
+  <ResponseField name="message" type="string">
+    Error message (if ok=false)
+  </ResponseField>
+</ResponseField>
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "openai": {
+      "ok": true,
+      "snapshot": {
+        "account_id": "user-abc123",
+        "plan": "plus",
+        "usage": {
+          "gpt4o": {
+            "used": 42,
+            "limit": 80,
+            "reset_at": "2026-01-02T00:00:00.000Z"
+          }
+        }
+      }
+    },
+    "antigravity": null
+  }
+}
+```
+
+<Warning>
+This method requires at least one OAuth provider (OpenAI or Antigravity) to be authenticated. It will throw an error if neither is configured.
+</Warning>

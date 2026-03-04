@@ -1,97 +1,250 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: Welcome to loaf
+description: A terminal-first AI coding assistant built with Ink + React
+mode: custom
 ---
 
-## Setting up
+<div className="relative overflow-hidden bg-gradient-to-br from-[#8B6F47] via-[#5C4A2F] to-[#0f1117] dark:from-[#5C4A2F] dark:via-[#0f1117] dark:to-[#0f1117] py-20">
+  <div className="max-w-7xl mx-auto px-6 sm:px-8">
+    <div className="lg:grid lg:grid-cols-12 lg:gap-8 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
+          Welcome to loaf
+        </h1>
+        <p className="text-lg sm:text-xl text-gray-200 max-w-2xl mb-8">
+          A terminal-first AI coding assistant that brings powerful AI models, extensible tools, and custom skills directly to your command line.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a
+            href="/quickstart"
+            className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-lg text-white bg-[#8B6F47] hover:bg-[#C9A86A] transition-colors"
+          >
+            Get Started
+          </a>
+          <a
+            href="/core/tools"
+            className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-lg text-white border border-white/30 bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            Explore Tools
+          </a>
+        </div>
+      </div>
+      <div className="hidden lg:block lg:col-span-5 mt-12 lg:mt-0">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-[#8B6F47]/20 to-transparent blur-3xl"></div>
+          <div className="relative bg-[#1a1d27] dark:bg-[#1a1d27] rounded-2xl p-6 border border-[#27272a] shadow-2xl">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            </div>
+            <pre className="text-sm text-gray-300 overflow-x-auto">
+              <code>{`$ npm run dev
 
-Get your documentation site up and running in minutes.
+loaf v0.2.0
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+> Choose your model
+> Connect providers
+> Start coding with AI
 
-## Make it yours
+Type /help for commands`}</code>
+            </pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-Design a docs site that looks great and empowers your users.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-semibold text-gray-900 dark:text-white mb-4">
+    Quick start
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Get loaf running in your terminal in minutes
+  </p>
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+  <Steps>
+    <Step title="Install dependencies">
+      Clone the repository and install dependencies:
+      
+      ```bash
+      git clone https://github.com/veyzyn/loaf.git
+      cd loaf
+      npm install
+      ```
+    </Step>
 
-## Create beautiful pages
+    <Step title="Start loaf">
+      Run loaf in TUI mode:
+      
+      ```bash
+      npm run dev
+      ```
+      
+      On first launch, loaf will guide you through onboarding to connect AI providers.
+    </Step>
 
-Everything you need to create world-class documentation.
+    <Step title="Connect a provider">
+      Choose from multiple AI providers:
+      
+      - **OpenAI**: OAuth login for ChatGPT models
+      - **OpenRouter**: API key for access to 200+ models
+      - **Antigravity**: OAuth for additional model access
+      
+      Follow the onboarding prompts to authenticate.
+    </Step>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+    <Step title="Start chatting">
+      Once authenticated, you can:
+      
+      - Ask questions and get AI assistance
+      - Execute shell commands with the `bash` tool
+      - Read and edit files with `read_file` and `apply_patch`
+      - Run JavaScript code with `run_js`
+      - Use skills with `$skill-name` syntax
+      
+      Type `/help` to see all available commands.
+    </Step>
+  </Steps>
+</div>
 
-## Need inspiration?
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-semibold text-gray-900 dark:text-white mb-4">
+    Key features
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Everything you need for AI-powered terminal development
+  </p>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+  <CardGroup cols={2}>
+    <Card title="Multi-provider support" icon="globe" href="/core/models">
+      Connect to OpenAI, OpenRouter, or Antigravity. Switch models on the fly.
+    </Card>
+    <Card title="Powerful tools" icon="wrench" href="/core/tools">
+      Built-in bash, file operations, JavaScript execution, and web search.
+    </Card>
+    <Card title="Skills system" icon="sparkles" href="/core/skills">
+      Load repeatable instruction bundles with simple `$skill-name` syntax.
+    </Card>
+    <Card title="Background processes" icon="terminal" href="/tools/bash">
+      Run long-running shell and JavaScript processes in the background with PTY support.
+    </Card>
+    <Card title="RPC API" icon="plug" href="/rpc/overview">
+      JSON-RPC 2.0 stdio server for programmatic integration.
+    </Card>
+    <Card title="Custom tools" icon="code" href="/customization/custom-tools">
+      Author your own JavaScript tools and load them automatically.
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-semibold text-gray-900 dark:text-white mb-4">
+    Explore by topic
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Find what you need to build with loaf
+  </p>
+
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <a
+      href="/usage/commands"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#8B6F47] dark:hover:border-[#8B6F47] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Slash commands
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Master loaf's command interface with `/auth`, `/model`, `/history`, and more.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#8B6F47] group-hover:text-[#C9A86A]">
+          Learn commands
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a
+      href="/tools/bash"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#8B6F47] dark:hover:border-[#8B6F47] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Shell execution
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Run shell commands with persistent state, PTY support, and background mode.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#8B6F47] group-hover:text-[#C9A86A]">
+          Explore bash tool
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a
+      href="/customization/custom-tools"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#8B6F47] dark:hover:border-[#8B6F47] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Custom tools
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Author JavaScript tools that extend loaf's capabilities.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#8B6F47] group-hover:text-[#C9A86A]">
+          Build tools
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a
+      href="/rpc/overview"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#8B6F47] dark:hover:border-[#8B6F47] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          RPC integration
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Integrate loaf into your tools with JSON-RPC 2.0 over stdio.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#8B6F47] group-hover:text-[#C9A86A]">
+          View API
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="bg-gradient-to-br from-[#8B6F47] to-[#5C4A2F] dark:from-[#5C4A2F] dark:to-[#1a1d27] rounded-2xl p-8 sm:p-12">
+    <div className="max-w-3xl">
+      <h2 className="text-3xl font-bold text-white mb-4">
+        Ready to get started?
+      </h2>
+      <p className="text-lg text-gray-200 mb-8">
+        Install loaf and start building with AI in your terminal today.
+      </p>
+      <a
+        href="/quickstart"
+        className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-lg text-white bg-white/20 hover:bg-white/30 border border-white/30 transition-colors"
+      >
+        View quickstart guide
+      </a>
+    </div>
+  </div>
+</div>

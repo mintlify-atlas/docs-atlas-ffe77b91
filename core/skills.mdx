@@ -1,0 +1,276 @@
+---
+title: Skills System
+description: Learn how skills provide reusable instructions and workflows in loaf
+---
+
+## Overview
+
+Skills are reusable instruction sets stored in `SKILL.md` files that extend loaf's capabilities with domain-specific workflows, templates, and references. When you mention a skill by name (using `$skill-name`) or when your task matches a skill's description, loaf automatically loads and follows those instructions.
+
+## How Skills Work
+
+### Discovery
+
+Loaf automatically discovers skills from multiple directories in priority order:
+
+1. **Repository skills** - `.agents/skills/` directories from your current working directory up to the git root
+2. **Loaf data directory** - `~/.loaf/skills/` for user-installed skills
+3. **Home directory** - `~/.agents/skills/` for global skills
+
+Each skill is a directory containing a `SKILL.md` file:
+
+```
+.agents/skills/
+├── mintlify/
+│   └── SKILL.md
+├── python-testing/
+│   ├── SKILL.md
+│   ├── scripts/
+│   └── references/
+└── api-docs/
+    └── SKILL.md
+```
+
+### Skill Structure
+
+A skill directory typically contains:
+
+- **`SKILL.md`** (required) - Main instruction file
+- **`scripts/`** (optional) - Executable scripts referenced by the skill
+- **`references/`** (optional) - Documentation, examples, or reference materials
+- **`assets/`** (optional) - Templates, config files, or other resources
+
+## Using Skills
+
+### Explicit Mentions
+
+Mention a skill by name using the `$` prefix:
+
+```bash
+loaf "Use $mintlify to add a new API reference page"
+loaf "Apply $python-testing to set up pytest for this module"
+loaf "$doc-author help me write a tutorial for this feature"
+```
+
+The pattern matcher recognizes skill names in the format:
+
+```typescript
+/(^|[^\w$])\$([a-zA-Z0-9][a-zA-Z0-9._:-]*)/g
+```
+
+Valid skill name characters: letters, numbers, `.`, `_`, `:`, `-`
+
+### Auto-Matching
+
+Loaf can automatically select skills when your task description clearly matches a skill's description, even without explicit `$` mention.
+
+<Note>
+Auto-matching is evaluated per turn - skills don't carry over to subsequent messages unless re-mentioned.
+</Note>
+
+### Progressive Disclosure
+
+When using a skill, loaf follows a progressive disclosure pattern:
+
+1. Opens the `SKILL.md` file and reads only what's needed
+2. Resolves relative paths (e.g., `scripts/foo.py`) relative to the skill directory
+3. Loads specific referenced files from `references/` only when required
+4. Reuses assets and templates instead of recreating from scratch
+
+## Skill Metadata
+
+### Skill Definition
+
+Each discovered skill is represented internally as:
+
+```typescript
+type SkillDefinition = {
+  name: string;              // Directory name
+  nameLower: string;         // Lowercase for matching
+  description: string;       // Extracted from SKILL.md
+  descriptionPreview: string; // First 8 words
+  content: string;           // Full SKILL.md content
+  sourcePath: string;        // Full path to SKILL.md
+  directoryPath: string;     // Skill directory path
+};
+```
+
+### Description Extraction
+
+The skill description is extracted from `SKILL.md` by:
+
+1. Splitting content into paragraphs
+2. Finding the first non-header, non-code paragraph
+3. Cleaning markdown formatting (bold, code, bullets)
+4. Using first meaningful text as description
+
+<CodeGroup>
+```markdown SKILL.md
+# Python Testing Skill
+
+Set up and configure pytest for Python projects with best practices and fixtures.
+
+This skill helps you create test suites...
+```
+
+```text Extracted Description
+"Set up and configure pytest for Python projects with best practices and fixtures."
+```
+</CodeGroup>
+
+## Skill Catalog
+
+The skill catalog aggregates all discovered skills:
+
+```typescript
+type SkillCatalog = {
+  directory: string;       // Comma-separated search paths
+  directories: string[];   // All searched directories
+  skills: SkillDefinition[]; // Discovered skills (sorted by name)
+  errors: string[];        // Discovery errors
+};
+```
+
+Load the catalog programmatically:
+
+```typescript
+import { loadSkillsCatalog } from "./skills/loader.js";
+
+const catalog = loadSkillsCatalog();
+console.log(`Found ${catalog.skills.length} skills`);
+catalog.errors.forEach(err => console.error(err));
+```
+
+## Directory Scanning
+
+Skill discovery includes:
+
+- **Depth limit**: Maximum 6 levels deep
+- **Directory limit**: Maximum 2,000 directories per root
+- **Deduplication**: Symlinks are resolved and deduplicated
+- **Exclusions**: Dotfiles (starting with `.`) are skipped
+
+## Selection and Context
+
+When skills are selected for a prompt:
+
+```typescript
+type SkillSelection = {
+  explicitMentions: string[];   // $skill-name mentions found
+  explicit: SkillDefinition[];  // Matched explicit skills
+  autoMatched: SkillDefinition[]; // Auto-selected skills
+  combined: SkillDefinition[];   // All skills to use
+};
+```
+
+The skill context is built with:
+
+```typescript
+import { buildSkillPromptContext } from "./skills/prompt.js";
+
+const context = buildSkillPromptContext(userPrompt, catalog.skills);
+// context.selection - selected skills
+// context.modelPrompt - transformed prompt for model
+// context.instructionBlock - full skill instructions
+```
+
+## Implementation Details
+
+### Source Files
+
+- **`src/skills/loader.ts`** - Skill discovery and catalog loading
+- **`src/skills/matcher.ts`** - Skill mention parsing
+- **`src/skills/prompt.ts`** - Skill context building
+- **`src/skills/types.ts`** - Type definitions
+
+### Key Functions
+
+<CodeGroup>
+```typescript Discovery
+import {
+  getSkillsDirectory,
+  getRepoSkillsDirectories,
+  getSkillsDirectories,
+  loadSkillsCatalog,
+} from "./skills/loader.js";
+
+// Get loaf data skills directory
+const loafSkills = getSkillsDirectory();
+// => ~/.loaf/skills
+
+// Get repo-local skills from cwd up to git root
+const repoSkills = getRepoSkillsDirectories();
+// => ["/project/.agents/skills", "/project/backend/.agents/skills"]
+
+// Get all skill directories
+const allDirs = getSkillsDirectories();
+
+// Load complete catalog
+const catalog = loadSkillsCatalog();
+```
+
+```typescript Parsing
+import { parseExplicitSkillMentions } from "./skills/matcher.js";
+
+const prompt = "Use $mintlify and $doc-author to create docs";
+const mentions = parseExplicitSkillMentions(prompt);
+// => ["mintlify", "doc-author"]
+```
+
+```typescript Context Building
+import {
+  buildSkillPromptContext,
+  buildSkillInstructionBlock,
+  hasSkillMentions,
+} from "./skills/prompt.js";
+
+// Check if prompt has skill mentions
+if (hasSkillMentions(prompt)) {
+  const context = buildSkillPromptContext(prompt, skills);
+  // Use context.instructionBlock in system prompt
+}
+```
+</CodeGroup>
+
+## Best Practices
+
+### Writing Skills
+
+1. **Clear description** - First paragraph should clearly explain the skill's purpose
+2. **Progressive structure** - Put essential instructions first, details later
+3. **Relative paths** - Use relative paths for scripts and references
+4. **Self-contained** - Include all necessary templates and references
+5. **Tested workflows** - Ensure scripts work across environments
+
+### Using Skills
+
+1. **Explicit over implicit** - Use `$skill-name` when you know which skill to use
+2. **Single responsibility** - One skill per specific workflow
+3. **Combine when needed** - Multiple skills can work together
+4. **Check availability** - Use `loaf skills list` to see available skills
+
+### Repository Integration
+
+For project-specific skills:
+
+```bash
+# Create project skills directory
+mkdir -p .agents/skills/my-workflow
+
+# Add skill file
+cat > .agents/skills/my-workflow/SKILL.md << 'EOF'
+Project-specific workflow for building and deploying.
+
+## Steps
+1. Run build...
+EOF
+
+# Commit to share with team
+git add .agents/
+git commit -m "Add project workflow skill"
+```
+
+## Related
+
+- [Custom Tools](/core/tools) - Extend loaf with executable tools
+- [Creating Skills](/customization/creating-skills) - Authoring your own skills

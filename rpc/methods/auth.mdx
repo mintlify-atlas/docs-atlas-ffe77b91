@@ -1,0 +1,301 @@
+---
+title: "Auth Methods"
+description: "Authentication and API key management for OpenAI, OpenRouter, Antigravity, and Exa"
+---
+
+## auth.status
+
+Get the current authentication status for all providers.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"auth.status","params":{}}
+```
+
+### Parameters
+
+No parameters required.
+
+### Response
+
+<ResponseField name="enabled_providers" type="array" required>
+  Array of enabled providers: `["openai", "openrouter", "antigravity"]`
+</ResponseField>
+
+<ResponseField name="has_openai_token" type="boolean" required>
+  Whether OpenAI OAuth token is configured
+</ResponseField>
+
+<ResponseField name="has_openrouter_key" type="boolean" required>
+  Whether OpenRouter API key is configured
+</ResponseField>
+
+<ResponseField name="has_antigravity_token" type="boolean" required>
+  Whether Antigravity OAuth token is configured
+</ResponseField>
+
+<ResponseField name="antigravity_profile" type="object">
+  Antigravity user profile object (if authenticated)
+</ResponseField>
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "enabled_providers": ["openai", "openrouter"],
+    "has_openai_token": true,
+    "has_openrouter_key": true,
+    "has_antigravity_token": false,
+    "antigravity_profile": null
+  }
+}
+```
+
+---
+
+## auth.connect.openai
+
+Initiate OpenAI OAuth login flow. In RPC mode, auth URLs/device codes are emitted as events.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"auth.connect.openai","params":{"mode":"device_code"}}
+```
+
+### Parameters
+
+<ParamField path="mode" type="string">
+  Login mode: `"auto"`, `"browser"`, or `"device_code"`. Defaults to `"auto"`.
+  - `"auto"` - Automatic browser launch (non-RPC mode)
+  - `"browser"` - Browser-based OAuth flow
+  - `"device_code"` - Device code flow (recommended for RPC mode)
+</ParamField>
+
+<ParamField path="originator" type="string">
+  Optional originator identifier for tracking
+</ParamField>
+
+### Response
+
+<ResponseField name="provider" type="string" required>
+  Always returns `"openai"`
+</ResponseField>
+
+<ResponseField name="login_method" type="string" required>
+  The login method used: `"browser"` or `"device_code"`
+</ResponseField>
+
+<ResponseField name="account_id" type="string" required>
+  OpenAI account ID
+</ResponseField>
+
+### Events Emitted
+
+During the authentication flow, the server emits:
+
+- `auth.flow.started` - Flow initiated
+- `auth.flow.url` - Browser URL (for browser mode)
+- `auth.flow.device_code` - Device code details (for device code mode)
+- `auth.flow.completed` - Authentication succeeded
+- `auth.flow.failed` - Authentication failed
+- `state.changed` - Runtime state updated
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "provider": "openai",
+    "login_method": "device_code",
+    "account_id": "user-abc123"
+  }
+}
+```
+
+<Note>
+In RPC mode, listen for `auth.flow.device_code` events:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "type": "auth.flow.device_code",
+    "timestamp": "2026-01-01T00:00:00.000Z",
+    "payload": {
+      "provider": "openai",
+      "verification_url": "https://auth.openai.com/activate",
+      "user_code": "ABCD-EFGH",
+      "interval_seconds": 5,
+      "expires_in_seconds": 600
+    }
+  }
+}
+```
+</Note>
+
+---
+
+## auth.connect.antigravity
+
+Initiate Antigravity OAuth login flow.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":3,"method":"auth.connect.antigravity","params":{}}
+```
+
+### Parameters
+
+No parameters required.
+
+### Response
+
+<ResponseField name="provider" type="string" required>
+  Always returns `"antigravity"`
+</ResponseField>
+
+<ResponseField name="profile" type="object" required>
+  Antigravity user profile object
+</ResponseField>
+
+### Events Emitted
+
+- `auth.flow.started`
+- `auth.flow.url` - Browser URL for OAuth
+- `auth.flow.completed`
+- `auth.flow.failed`
+- `state.changed`
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "provider": "antigravity",
+    "profile": {
+      "id": "user_xyz789",
+      "email": "user@example.com",
+      "name": "Alice"
+    }
+  }
+}
+```
+
+---
+
+## auth.set.openrouter_key
+
+Configure OpenRouter API key. This will fetch and cache the model catalog.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":4,"method":"auth.set.openrouter_key","params":{"api_key":"sk-or-v1-..."}}
+```
+
+### Parameters
+
+<ParamField path="api_key" type="string" required>
+  OpenRouter API key (must be non-empty)
+</ParamField>
+
+### Response
+
+<ResponseField name="configured" type="boolean" required>
+  Always returns `true` if key was set
+</ResponseField>
+
+<ResponseField name="model_count" type="number" required>
+  Number of models discovered from OpenRouter
+</ResponseField>
+
+<ResponseField name="source" type="string" required>
+  Source of model catalog: `"api"` or `"fallback"`
+</ResponseField>
+
+### Example
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "result": {
+    "configured": true,
+    "model_count": 127,
+    "source": "api"
+  }
+}
+```
+
+<Warning>
+The API key is stored unencrypted in the runtime state file. Ensure proper file permissions.
+</Warning>
+
+---
+
+## auth.set.exa_key
+
+Configure Exa API key for the built-in search tool, or disable it by passing `"skip"`.
+
+### Request
+
+```json
+{"jsonrpc":"2.0","id":5,"method":"auth.set.exa_key","params":{"api_key":"exa_..."}}
+```
+
+### Parameters
+
+<ParamField path="api_key" type="string" required>
+  Exa API key, or the literal string `"skip"` to disable Exa search
+</ParamField>
+
+### Response
+
+<ResponseField name="configured" type="boolean" required>
+  `true` if key was set, `false` if skipped
+</ResponseField>
+
+<ResponseField name="skipped" type="boolean" required>
+  `true` if the user passed `"skip"`
+</ResponseField>
+
+### Example (Set Key)
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "configured": true,
+    "skipped": false
+  }
+}
+```
+
+### Example (Skip)
+
+```json
+{"jsonrpc":"2.0","id":6,"method":"auth.set.exa_key","params":{"api_key":"skip"}}
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "result": {
+    "configured": false,
+    "skipped": true
+  }
+}
+```

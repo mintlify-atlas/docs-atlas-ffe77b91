@@ -1,0 +1,276 @@
+---
+title: Handshake
+description: The rpc.handshake method for protocol negotiation
+---
+
+The `rpc.handshake` method is the first call clients should make to negotiate protocol version and discover server capabilities.
+
+## Method
+
+`rpc.handshake`
+
+## Request Format
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "rpc.handshake",
+  "params": {
+    "client_name": "demo",
+    "client_version": "0.1.0",
+    "protocol_version": "1.0.0",
+    "strict": false
+  }
+}
+```
+
+### Parameters
+
+All parameters are optional:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `client_name` | string | Client application name (informational) |
+| `client_version` | string | Client application version (informational) |
+| `protocol_version` | string | Requested protocol version (e.g., `"1.0.0"`) |
+| `strict` | boolean | If `true`, fail if protocol version doesn't match exactly |
+
+<Info>
+If `strict: false` (default), the server accepts any protocol version and returns its own version. Clients should check the returned `protocol_version` to ensure compatibility.
+</Info>
+
+## Response Format
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocol_version": "1.0.0",
+    "server_name": "loaf",
+    "capabilities": {
+      "events": true,
+      "command_execute": true,
+      "multi_session": true,
+      "image_inputs": ["path", "data_url"]
+    },
+    "methods": [
+      "auth.connect.antigravity",
+      "auth.connect.openai",
+      "auth.set.exa_key",
+      "auth.set.openrouter_key",
+      "auth.status",
+      "command.execute",
+      "debug.set",
+      "history.clear_session",
+      "history.get",
+      "history.list",
+      "limits.get",
+      "model.list",
+      "model.openrouter.providers",
+      "model.select",
+      "onboarding.complete",
+      "onboarding.status",
+      "rpc.handshake",
+      "session.create",
+      "session.get",
+      "session.interrupt",
+      "session.queue.clear",
+      "session.queue.list",
+      "session.send",
+      "session.steer",
+      "skills.list",
+      "state.get",
+      "system.ping",
+      "system.shutdown",
+      "tools.list"
+    ]
+  }
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `protocol_version` | string | Server's protocol version (`"1.0.0"`) |
+| `server_name` | string | Server identifier (`"loaf"`) |
+| `capabilities` | object | Feature flags the server supports |
+| `methods` | string[] | List of all available RPC methods (sorted alphabetically) |
+
+### Capabilities
+
+| Capability | Type | Description |
+|------------|------|-------------|
+| `events` | boolean | Server emits event notifications |
+| `command_execute` | boolean | Supports `command.execute` for tool execution |
+| `multi_session` | boolean | Supports multiple concurrent sessions |
+| `image_inputs` | string[] | Supported image input formats (`"path"`, `"data_url"`) |
+
+## Version Negotiation
+
+### Flexible Mode (default)
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "rpc.handshake",
+  "params": {
+    "protocol_version": "1.0.0"
+  }
+}
+```
+
+Server responds with its version. Client checks compatibility:
+
+```typescript
+const response = await sendRequest({
+  method: "rpc.handshake",
+  params: { protocol_version: "1.0.0" }
+});
+
+if (response.result.protocol_version !== "1.0.0") {
+  console.warn("Protocol version mismatch!");
+  // Handle gracefully - protocol 1.x is additive
+}
+```
+
+### Strict Mode
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "rpc.handshake",
+  "params": {
+    "protocol_version": "2.0.0",
+    "strict": true
+  }
+}
+```
+
+If versions don't match:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32602,
+    "message": "unsupported protocol_version: 2.0.0",
+    "data": {
+      "reason": "unsupported_protocol_version",
+      "supported": "1.0.0"
+    }
+  }
+}
+```
+
+## Method Discovery
+
+The `methods` array lists all callable methods. Clients can dynamically check for feature availability:
+
+```typescript
+const { methods } = handshakeResponse.result;
+
+if (methods.includes("auth.connect.openai")) {
+  // OpenAI authentication is available
+}
+
+if (methods.includes("session.steer")) {
+  // Session steering is supported
+}
+```
+
+## Typical Handshake Sequence
+
+**1. Client connects and sends handshake**
+```json
+{"jsonrpc":"2.0","id":1,"method":"rpc.handshake","params":{"client_name":"demo","protocol_version":"1.0.0"}}
+```
+
+**2. Server responds with capabilities**
+```json
+{"jsonrpc":"2.0","id":1,"result":{"protocol_version":"1.0.0","server_name":"loaf","capabilities":{"events":true,"command_execute":true,"multi_session":true,"image_inputs":["path","data_url"]},"methods":["..."]}}  
+```
+
+**3. Client validates version and capabilities**
+```typescript
+if (result.capabilities.events) {
+  // Start listening for event notifications
+  listenForEvents();
+}
+```
+
+**4. Client proceeds with session operations**
+```json
+{"jsonrpc":"2.0","id":2,"method":"session.create","params":{}}
+```
+
+## Implementation Details
+
+From `src/rpc/router.ts:49-76`:
+
+```typescript
+this.handlers.set("rpc.handshake", async (params) => {
+  const body = assertObjectParams(params ?? {}, "rpc.handshake");
+  const protocolVersion = assertOptionalString(
+    body.protocol_version,
+    "protocol_version",
+    "rpc.handshake"
+  );
+  const strict = assertOptionalBoolean(body.strict, "strict", "rpc.handshake") ?? false;
+
+  if (strict && protocolVersion && protocolVersion !== PROTOCOL_VERSION) {
+    throw buildRpcMethodError(
+      JSON_RPC_ERROR.INVALID_PARAMS,
+      `unsupported protocol_version: ${protocolVersion}`,
+      {
+        reason: "unsupported_protocol_version",
+        supported: PROTOCOL_VERSION,
+      }
+    );
+  }
+
+  return {
+    protocol_version: PROTOCOL_VERSION,
+    server_name: "loaf",
+    capabilities: {
+      events: true,
+      command_execute: true,
+      multi_session: true,
+      image_inputs: ["path", "data_url"],
+    },
+    methods: this.listMethods(),
+  };
+});
+```
+
+The protocol version constant is defined at `src/rpc/router.ts:17`:
+
+```typescript
+const PROTOCOL_VERSION = "1.0.0";
+```
+
+## Best Practices
+
+1. **Always handshake first**: Call `rpc.handshake` before any other methods
+2. **Check capabilities**: Use the capabilities object to detect features
+3. **Method discovery**: Use the methods array rather than hardcoding available methods
+4. **Version checking**: In production, validate `protocol_version` matches your expectations
+5. **Graceful degradation**: If a minor version differs, check for specific methods rather than failing
+
+## Error Handling
+
+The handshake method can return these errors:
+
+| Code | Reason | Description |
+|------|--------|-------------|
+| `-32602` | `invalid_params` | Parameter validation failed |
+| `-32602` | `unsupported_protocol_version` | Strict mode version mismatch |
+
+<Warning>
+In strict mode, an unsupported protocol version will fail the handshake. Use strict mode only when exact version matching is required.
+</Warning>

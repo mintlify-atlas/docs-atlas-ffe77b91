@@ -1,0 +1,149 @@
+---
+title: Event system overview
+description: Understanding loaf's event notification system in RPC mode
+---
+
+The loaf RPC server emits real-time notifications as JSON-RPC events during AI interactions, authentication flows, and state changes.
+
+## Event format
+
+All events follow the JSON-RPC 2.0 notification format with a standard structure:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "type": "session.status",
+    "timestamp": "2026-01-01T00:00:00.000Z",
+    "payload": {
+      "session_id": "ses_abc123",
+      "pending": true,
+      "status_label": "thinking..."
+    }
+  }
+}
+```
+
+<ParamField path="method" type="string" required>
+  Always set to `"event"` for all event notifications
+</ParamField>
+
+<ParamField path="params.type" type="string" required>
+  The specific event type (e.g., `"session.status"`, `"auth.flow.url"`)
+</ParamField>
+
+<ParamField path="params.timestamp" type="string" required>
+  ISO 8601 timestamp when the event was emitted
+</ParamField>
+
+<ParamField path="params.payload" type="object" required>
+  Event-specific data. Structure varies by event type.
+</ParamField>
+
+## Event categories
+
+### Session events
+
+Track AI conversation state, streaming output, and tool execution:
+
+- `session.status` - Status updates (pending, thinking, complete)
+- `session.message.appended` - New messages added to conversation
+- `session.stream.chunk` - Streaming text chunks from AI
+- `session.tool.call.started` - Tool execution begins
+- `session.tool.call.completed` - Tool execution finishes
+- `session.tool.results` - Tool results available
+- `session.completed` - Turn finished
+- `session.interrupted` - User interrupted the turn
+- `session.error` - Error occurred during processing
+
+See [Session events](/rpc/events/session-events) for detailed payload structures.
+
+### Auth events
+
+Track OAuth flows and authentication state changes:
+
+- `auth.flow.started` - OAuth flow initiated
+- `auth.flow.url` - Browser URL available (user must open)
+- `auth.flow.device_code` - Device code available (display to user)
+- `auth.flow.completed` - Authentication succeeded
+- `auth.flow.failed` - Authentication failed
+- `state.changed` - Global state updated (auth added/removed)
+
+See [Auth events](/rpc/events/auth-events) for OAuth workflow details.
+
+## Listening for events
+
+Events arrive as NDJSON notifications on stdout. Parse each line as JSON and check for `method === "event"`:
+
+```python
+import json
+import sys
+
+for line in sys.stdin:
+    msg = json.loads(line)
+    if msg.get("method") == "event":
+        event_type = msg["params"]["type"]
+        payload = msg["params"]["payload"]
+        print(f"Event: {event_type}")
+        print(f"Payload: {payload}")
+```
+
+## Event ordering
+
+Events are emitted in chronological order but may arrive rapidly during streaming. Your client should:
+
+1. **Buffer events** if processing takes time
+2. **Handle out-of-order delivery** (use timestamps)
+3. **React to session.completed** to know when a turn finishes
+
+<Note>
+  Events are fire-and-forget notifications. The server does not expect acknowledgment responses.
+</Note>
+
+## Common patterns
+
+### Displaying streaming text
+
+```javascript
+if (event.type === 'session.stream.chunk') {
+  process.stdout.write(event.payload.text);
+}
+```
+
+### Tracking tool execution
+
+```javascript
+if (event.type === 'session.tool.call.started') {
+  console.log(`Tool: ${event.payload.tool_name}`);
+}
+if (event.type === 'session.tool.call.completed') {
+  console.log(`Result: ${event.payload.ok ? 'success' : 'error'}`);
+}
+```
+
+### Handling OAuth in headless mode
+
+```javascript
+if (event.type === 'auth.flow.url') {
+  console.log(`Open this URL: ${event.payload.url}`);
+}
+if (event.type === 'auth.flow.device_code') {
+  console.log(`Device code: ${event.payload.user_code}`);
+  console.log(`Visit: ${event.payload.verification_url}`);
+}
+```
+
+## Debugging events
+
+Enable debug logging to see all events:
+
+```bash
+DEBUG=loaf:events npm run rpc
+```
+
+## Related
+
+- [Session events](/rpc/events/session-events) - Complete session event reference
+- [Auth events](/rpc/events/auth-events) - OAuth event sequences
+- [RPC overview](/rpc/overview) - Protocol fundamentals

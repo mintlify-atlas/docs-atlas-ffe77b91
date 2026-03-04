@@ -1,0 +1,150 @@
+---
+title: Installation
+description: Get loaf installed and ready to run on your machine
+---
+
+loaf is a terminal-first AI coding assistant that runs locally on your machine. This guide covers system requirements, installation steps, and first-run setup.
+
+## System requirements
+
+Before installing loaf, ensure your system meets these requirements:
+
+<Note>
+  **Node.js version**: loaf requires Node.js `>=20`. Check your version with `node --version`.
+</Note>
+
+- **Node.js**: Version 20 or higher
+- **npm**: Comes with Node.js
+- **Git**: For cloning the repository
+- **Terminal**: Any modern terminal emulator
+
+### Platform support
+
+loaf runs on:
+
+- macOS (Intel and Apple Silicon)
+- Linux (most distributions)
+- Windows (with WSL or native)
+
+## Installation steps
+
+<Steps>
+  <Step title="Clone the repository">
+    Clone loaf from GitHub:
+
+    ```bash
+    git clone https://github.com/veyzyn/loaf.git
+    cd loaf
+    ```
+
+    This downloads the source code to your machine.
+  </Step>
+
+  <Step title="Install dependencies">
+    Install all required packages:
+
+    ```bash
+    npm install
+    ```
+
+    This installs dependencies including:
+    - **Ink**: Terminal UI framework
+    - **OpenAI SDK**: Model API client
+    - **node-pty**: PTY support for shell tools
+    - **keytar**: Secure credential storage
+
+    <Warning>
+      On Linux, you may need to install additional system packages for `keytar`. See the [keytar documentation](https://github.com/atom/node-keytar#linux) for details.
+    </Warning>
+  </Step>
+
+  <Step title="Verify installation">
+    Check that loaf is ready to run:
+
+    ```bash
+    npm run dev
+    ```
+
+    You should see the loaf startup screen. If this is your first run, you'll be prompted to set up authentication.
+
+    Press `Ctrl+C` (or `Cmd+C` on macOS) to exit.
+  </Step>
+</Steps>
+
+## Configuration directory
+
+loaf creates a data directory on first run to store configuration, credentials, and chat history:
+
+- **macOS/Linux**: `~/.loaf`
+- **Windows**: `%USERPROFILE%\.loaf`
+
+This directory contains:
+
+- `auth.json` — OAuth tokens and API keys
+- `state.json` — Saved settings and model selection
+- `chat-sessions/` — Chat history records
+- `tools/` — Custom tool scripts (see [Custom Tools](/customization/custom-tools))
+- `skills/` — Custom skill definitions (see [Creating Skills](/customization/creating-skills))
+
+## Running loaf
+
+loaf has two modes:
+
+### TUI mode (default)
+
+Run the interactive terminal UI:
+
+```bash
+npm run dev
+```
+
+This starts loaf in terminal user interface mode where you can chat with AI models, execute tools, and manage settings.
+
+### RPC mode
+
+Run loaf as a JSON-RPC 2.0 server over stdio:
+
+```bash
+npm run rpc
+```
+
+This mode is for programmatic integration. See [RPC Protocol](/rpc/overview) for details.
+
+## Development commands
+
+The following npm scripts are available:
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start loaf TUI |
+| `npm run rpc` | Start RPC server |
+| `npm run typecheck` | Run TypeScript type checking |
+| `npm run test` | Run test suite |
+| `npm run test:coverage` | Run tests with coverage report |
+| `npm run spinners` | View spinner gallery (dev tool) |
+
+## First run
+
+On your first launch, loaf will:
+
+1. Create the `~/.loaf` data directory
+2. Display the onboarding flow
+3. Prompt you to connect an AI provider (OpenAI, OpenRouter, or Antigravity)
+4. Optionally configure web search via Exa API
+
+<Note>
+  You can re-run onboarding at any time with the `/onboarding` command.
+</Note>
+
+## Next steps
+
+Once installed, proceed to the [Quickstart](/quickstart) guide to authenticate and start using loaf.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Complete your first setup and run your first commands
+  </Card>
+  <Card title="Authentication" icon="key" href="/core/authentication">
+    Learn about provider authentication options
+  </Card>
+</CardGroup>

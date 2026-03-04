@@ -1,0 +1,188 @@
+---
+title: Slash Commands
+description: Complete reference for all slash commands in loaf
+---
+
+loaf provides a set of slash commands for managing your session, configuration, and workflow. Type `/` in the prompt to see autocomplete suggestions.
+
+## Available Commands
+
+### /auth
+
+Add or configure authentication providers.
+
+```bash
+/auth
+```
+
+Opens a selector to authenticate with:
+- OpenAI (ChatGPT OAuth)
+- Antigravity (OAuth)
+- OpenRouter (API key)
+
+<Note>
+You can configure multiple providers and switch between them using `/model`.
+</Note>
+
+### /onboarding
+
+Re-run the initial setup flow to configure authentication and API keys.
+
+```bash
+/onboarding
+```
+
+This command:
+- Guides you through provider authentication
+- Prompts for the Exa API key (for web search)
+- Helps you select your initial model
+
+### /forgeteverything
+
+Wipe all local configuration and restart onboarding from scratch.
+
+```bash
+/forgeteverything
+```
+
+<Warning>
+This command permanently deletes:
+- Authentication tokens
+- API keys
+- Model selections
+- Input history
+- Persisted state
+
+Chat history sessions are preserved.
+</Warning>
+
+### /model
+
+Choose your model and thinking level.
+
+```bash
+/model
+```
+
+Opens an interactive selector for:
+- **Model selection** - Choose from available models across all authenticated providers
+- **Thinking level** - Set reasoning effort (OFF, MINIMAL, LOW, MEDIUM, HIGH, XHIGH)
+- **Provider selection** - For OpenRouter models, optionally specify a preferred provider
+
+Thinking levels control the model's reasoning depth:
+- `OFF` - Disable reasoning effort
+- `MINIMAL` - Very light reasoning, fastest with thinking
+- `LOW` - Fast with lighter reasoning
+- `MEDIUM` - Balanced depth and speed (recommended)
+- `HIGH` - Maximum reasoning depth
+- `XHIGH` - Extra high reasoning for the hardest tasks
+
+### /limits
+
+Show OAuth usage limits for your authenticated providers.
+
+```bash
+/limits
+```
+
+Displays:
+- OpenAI usage snapshot (if authenticated)
+- Antigravity usage snapshot (if authenticated)
+- Current rate limits and quotas
+
+### /history
+
+Resume a saved chat session.
+
+```bash
+# Open interactive session selector
+/history
+
+# Resume the most recent session
+/history last
+
+# Resume a specific session by ID or prefix
+/history <session-id>
+/history abc123
+```
+
+Sessions are stored in `~/.loaf/sessions/` organized by date. See [Chat History](/usage/chat-history) for more details.
+
+### /compress
+
+Compress conversation context to reduce token usage.
+
+```bash
+/compress
+```
+
+Uses summarization to reduce the size of your conversation history while preserving key information. Helpful when approaching context window limits.
+
+<Note>
+loaf also performs automatic compression when you reach 82% of the model's context window.
+</Note>
+
+### /skills
+
+List all available skills from your skill directories.
+
+```bash
+/skills
+```
+
+Searches for skills in:
+- `.agents/skills/` (repository-specific)
+- `~/.loaf/skills/` (user-specific)
+- `~/.agents/skills/` (global user skills)
+
+### /tools
+
+List all registered tools available to the model.
+
+```bash
+/tools
+```
+
+Shows built-in tools (bash, file operations, web search, etc.) and any custom tools loaded from your configuration.
+
+### /clear
+
+Clear all conversation messages and start fresh.
+
+```bash
+/clear
+```
+
+Resets the conversation while keeping your current session and configuration.
+
+### /help
+
+Show the list of available commands.
+
+```bash
+/help
+```
+
+### /quit or /exit
+
+Exit loaf.
+
+```bash
+/quit
+/exit
+```
+
+## Command Autocompletion
+
+When you type `/`, loaf displays command suggestions that match your input:
+
+```
+> /hi
+  /history - resume a saved chat
+```
+
+Use arrow keys to navigate and `Tab` or `Enter` to select.
+
+## Source Reference
+
+All slash commands are defined in `src/index.tsx:258-272`.

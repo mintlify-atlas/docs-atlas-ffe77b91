@@ -1,0 +1,285 @@
+---
+title: 'Bash Tool'
+description: 'Execute shell commands with persistent state and background process support'
+---
+
+## Overview
+
+The `bash` tool runs shell commands with login-shell semantics and persists current working directory (cwd) and environment variables across tool calls within a loaf session.
+
+## Features
+
+- **State Persistence**: Maintains cwd and environment variables across multiple bash tool calls
+- **Background Execution**: Run long-running processes asynchronously with session management
+- **PTY Support**: Full terminal emulation for interactive programs and TUIs
+- **Cross-Platform**: Supports zsh/bash/sh on Unix and PowerShell/cmd on Windows
+
+## bash
+
+Execute shell commands synchronously with automatic state capture.
+
+### Parameters
+
+<ParamField path="command" type="string" required>
+  Shell command text to execute.
+</ParamField>
+
+<ParamField path="timeout_seconds" type="number" default="120">
+  Optional timeout in seconds (max 1200).
+</ParamField>
+
+<ParamField path="cwd" type="string">
+  Optional starting working directory for this command. Also updates the tool session cwd baseline for subsequent calls.
+</ParamField>
+
+<ParamField path="env" type="object">
+  Optional environment variable overrides for this command. Variables are persisted in the tool session.
+</ParamField>
+
+<ParamField path="reset_session" type="boolean" default="false">
+  Reset persisted bash tool cwd/env state before execution.
+</ParamField>
+
+<ParamField path="run_in_background" type="boolean" default="false">
+  When true, start command asynchronously and return a background session ID.
+</ParamField>
+
+<ParamField path="session_name" type="string">
+  Optional friendly name for a background bash session.
+</ParamField>
+
+<ParamField path="reuse_session" type="boolean" default="true">
+  When `run_in_background` is true, reuse an existing running session with same `session_name` and cwd.
+</ParamField>
+
+<ParamField path="full_terminal" type="boolean" default="true">
+  When `run_in_background` is true, use a PTY terminal transport so TUIs/installers and key navigation work.
+</ParamField>
+
+<ParamField path="terminal_cols" type="number" default="120">
+  PTY columns when `full_terminal=true` (min 40, max 400).
+</ParamField>
+
+<ParamField path="terminal_rows" type="number" default="36">
+  PTY rows when `full_terminal=true` (min 10, max 200).
+</ParamField>
+
+### Usage Example
+
+```typescript
+// Simple command execution
+await bash({
+  command: "npm install"
+});
+
+// With environment variables
+await bash({
+  command: "npm run build",
+  env: {
+    NODE_ENV: "production"
+  }
+});
+
+// Background execution with PTY
+await bash({
+  command: "npm run dev",
+  run_in_background: true,
+  session_name: "dev-server",
+  full_terminal: true
+});
+```
+
+## Background Bash Tools
+
+### read_background_bash
+
+Read buffered stdout/stderr from a running or exited background bash session.
+
+#### Parameters
+
+<ParamField path="session_id" type="string" required>
+  Session ID returned by bash with `run_in_background=true`.
+</ParamField>
+
+<ParamField path="max_chars" type="number" default="8000">
+  Max characters per stream to return (max 120000).
+</ParamField>
+
+<ParamField path="stream" type="string" default="both">
+  Stream selector: `both`, `stdout`, or `stderr`.
+</ParamField>
+
+<ParamField path="peek" type="boolean" default="false">
+  When true, do not advance internal read cursor.
+</ParamField>
+
+#### Usage Example
+
+```typescript
+const output = await read_background_bash({
+  session_id: "bg-bash-1234567890-abcd1234",
+  max_chars: 10000,
+  stream: "stdout"
+});
+```
+
+### write_background_bash
+
+Write text or key input to a running background bash session.
+
+#### Parameters
+
+<ParamField path="session_id" type="string" required>
+  Session ID returned by bash with `run_in_background=true`.
+</ParamField>
+
+<ParamField path="input" type="string">
+  Text to write to stdin.
+</ParamField>
+
+<ParamField path="key" type="string">
+  Optional special key name. See [Special Keys](#special-keys) below.
+</ParamField>
+
+<ParamField path="repeat" type="number" default="1">
+  Repeat key presses when `key` is provided.
+</ParamField>
+
+<ParamField path="append_newline" type="boolean" default="true">
+  Append newline to input before writing.
+</ParamField>
+
+#### Special Keys
+
+The following special keys are supported:
+
+- `enter` - Enter/Return key
+- `tab` - Tab key
+- `esc` - Escape key
+- `up`, `down`, `left`, `right` - Arrow keys
+- `home`, `end` - Home and End keys
+- `pgup`, `pgdown` - Page Up and Page Down
+- `backspace`, `delete` - Backspace and Delete keys
+- `ctrl+c`, `ctrl+d`, `ctrl+z` - Control key combinations
+
+#### Usage Example
+
+```typescript
+// Send text input
+await write_background_bash({
+  session_id: "bg-bash-1234567890-abcd1234",
+  input: "npm start"
+});
+
+// Send special key
+await write_background_bash({
+  session_id: "bg-bash-1234567890-abcd1234",
+  key: "ctrl+c"
+});
+
+// Navigate menus with arrow keys
+await write_background_bash({
+  session_id: "bg-bash-1234567890-abcd1234",
+  key: "down",
+  repeat: 3
+});
+```
+
+### stop_background_bash
+
+Stop a background bash session.
+
+#### Parameters
+
+<ParamField path="session_id" type="string" required>
+  Session ID returned by bash with `run_in_background=true`.
+</ParamField>
+
+<ParamField path="force" type="boolean" default="false">
+  When true, send SIGKILL. Default false (SIGTERM).
+</ParamField>
+
+#### Usage Example
+
+```typescript
+await stop_background_bash({
+  session_id: "bg-bash-1234567890-abcd1234",
+  force: false
+});
+```
+
+### resize_background_bash
+
+Resize terminal dimensions for a running PTY-backed background bash session.
+
+#### Parameters
+
+<ParamField path="session_id" type="string" required>
+  Session ID returned by bash with `run_in_background=true`.
+</ParamField>
+
+<ParamField path="cols" type="number" required>
+  Terminal columns (40-400).
+</ParamField>
+
+<ParamField path="rows" type="number" required>
+  Terminal rows (10-200).
+</ParamField>
+
+#### Usage Example
+
+```typescript
+await resize_background_bash({
+  session_id: "bg-bash-1234567890-abcd1234",
+  cols: 160,
+  rows: 48
+});
+```
+
+### list_background_bash
+
+List known background bash sessions and their state.
+
+#### Parameters
+
+<ParamField path="include_exited" type="boolean" default="false">
+  Include exited sessions.
+</ParamField>
+
+#### Usage Example
+
+```typescript
+const sessions = await list_background_bash({
+  include_exited: true
+});
+```
+
+## PTY Mode
+
+When `full_terminal=true` is set for background bash sessions, the tool uses a PTY (pseudo-terminal) transport. This enables:
+
+- Full ANSI color and formatting support
+- Interactive TUI applications (vim, htop, etc.)
+- Navigation with arrow keys and special keys
+- Proper handling of terminal-aware installers
+
+## State Persistence
+
+The bash tool maintains session state across calls:
+
+1. **Working Directory**: Changes to cwd persist across bash tool invocations
+2. **Environment Variables**: Custom environment variables are maintained in the session
+3. **Reset**: Use `reset_session: true` to clear persisted state
+
+```typescript
+// First call - sets working directory
+await bash({ 
+  command: "cd /path/to/project",
+  cwd: "/path/to/project"
+});
+
+// Second call - uses previous cwd
+await bash({ 
+  command: "npm install" // runs in /path/to/project
+});
+```

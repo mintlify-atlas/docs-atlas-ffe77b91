@@ -1,0 +1,206 @@
+---
+title: Auth events
+description: OAuth flow events and authentication state changes
+---
+
+Auth events track OAuth authentication flows and state changes. In RPC mode, loaf does not auto-open browsers—your client must handle URLs and display device codes.
+
+## auth.flow.started
+
+Emitted when an OAuth flow begins.
+
+```json
+{
+  "type": "auth.flow.started",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "provider": "openai",
+    "flow_type": "browser"
+  }
+}
+```
+
+<ResponseField name="payload.provider" type="string">
+  Provider name: `"openai"` or `"antigravity"`
+</ResponseField>
+
+<ResponseField name="payload.flow_type" type="string">
+  Flow type: `"browser"` (OAuth redirect) or `"device_code"` (headless)
+</ResponseField>
+
+## auth.flow.url
+
+Emitted when a browser URL is ready for the user to open.
+
+```json
+{
+  "type": "auth.flow.url",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "provider": "openai",
+    "url": "https://auth.openai.com/authorize?client_id=...",
+    "expires_at": "2026-01-01T00:05:00.000Z"
+  }
+}
+```
+
+<ResponseField name="payload.url" type="string">
+  Full OAuth authorization URL. Your client must display this URL to the user.
+</ResponseField>
+
+<ResponseField name="payload.expires_at" type="string">
+  ISO 8601 timestamp when the URL expires (typically 5 minutes)
+</ResponseField>
+
+<Warning>
+  In RPC mode, loaf does NOT auto-open browsers. You must display this URL and instruct the user to open it.
+</Warning>
+
+## auth.flow.device_code
+
+Emitted for device code OAuth flows (headless/CI environments).
+
+```json
+{
+  "type": "auth.flow.device_code",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "provider": "openai",
+    "user_code": "ABCD-EFGH",
+    "verification_url": "https://auth.openai.com/device",
+    "expires_in": 900
+  }
+}
+```
+
+<ResponseField name="payload.user_code" type="string">
+  Short code the user must enter on the verification URL
+</ResponseField>
+
+<ResponseField name="payload.verification_url" type="string">
+  URL where the user enters the device code
+</ResponseField>
+
+<ResponseField name="payload.expires_in" type="number">
+  Seconds until the device code expires (typically 900 = 15 minutes)
+</ResponseField>
+
+### Device code flow example
+
+```javascript
+if (event.type === 'auth.flow.device_code') {
+  console.log('\nAuthentication Required:');
+  console.log(`1. Visit: ${event.payload.verification_url}`);
+  console.log(`2. Enter code: ${event.payload.user_code}`);
+  console.log(`3. Expires in ${event.payload.expires_in} seconds\n`);
+}
+```
+
+## auth.flow.completed
+
+Emitted when OAuth succeeds and credentials are stored.
+
+```json
+{
+  "type": "auth.flow.completed",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "provider": "openai",
+    "profile": {
+      "email": "user@example.com",
+      "name": "User Name"
+    }
+  }
+}
+```
+
+<ResponseField name="payload.profile" type="object">
+  User profile information from the provider (when available)
+</ResponseField>
+
+## auth.flow.failed
+
+Emitted when OAuth fails.
+
+```json
+{
+  "type": "auth.flow.failed",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "provider": "openai",
+    "error": "User canceled authentication",
+    "code": "user_canceled"
+  }
+}
+```
+
+<ResponseField name="payload.error" type="string">
+  Human-readable error message
+</ResponseField>
+
+<ResponseField name="payload.code" type="string">
+  Error code: `"user_canceled"`, `"timeout"`, `"network_error"`, etc.
+</ResponseField>
+
+## state.changed
+
+Emitted when global authentication state changes (provider added/removed).
+
+```json
+{
+  "type": "state.changed",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "change_type": "auth_updated",
+    "providers": ["openai", "openrouter"]
+  }
+}
+```
+
+<ResponseField name="payload.change_type" type="string">
+  Type of change: `"auth_updated"`, `"model_changed"`, `"config_changed"`
+</ResponseField>
+
+<ResponseField name="payload.providers" type="array">
+  List of currently authenticated provider names
+</ResponseField>
+
+## OAuth flow sequences
+
+### Browser flow (desktop)
+
+1. `auth.flow.started` - Flow begins
+2. `auth.flow.url` - URL available
+3. User opens URL in browser and approves
+4. `auth.flow.completed` - Success
+5. `state.changed` - Auth state updated
+
+### Device code flow (headless)
+
+1. `auth.flow.started` - Flow begins with `flow_type: "device_code"`
+2. `auth.flow.device_code` - Device code available
+3. User visits verification URL and enters code
+4. loaf polls for completion (no intermediate events)
+5. `auth.flow.completed` - Success
+6. `state.changed` - Auth state updated
+
+### Failure flow
+
+1. `auth.flow.started` - Flow begins
+2. `auth.flow.url` or `auth.flow.device_code` - Auth details provided
+3. User cancels or timeout occurs
+4. `auth.flow.failed` - Failure event
+
+## Handling timeouts
+
+Browser URLs expire after 5 minutes. Device codes expire after 15 minutes. If the user doesn't complete authentication in time, you'll receive `auth.flow.failed` with `code: "timeout"`.
+
+## API key authentication
+
+API key setup (OpenRouter, Exa) does not emit events—use the synchronous `auth.set.openrouter_key` and `auth.set.exa_key` methods instead.
+
+## Related
+
+- [Event system overview](/rpc/events/overview) - Event format and categories
+- [Auth methods](/rpc/methods/auth) - Authentication RPC methods
+- [RPC authentication](/rpc/authentication) - OAuth in RPC mode

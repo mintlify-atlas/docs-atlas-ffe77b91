@@ -1,0 +1,262 @@
+---
+title: Image Attachments
+description: Attach images via clipboard, file paths, and data URLs
+---
+
+loaf supports attaching images to your prompts for vision-capable models. Images can be added from the clipboard or by file path.
+
+## Clipboard Image Paste
+
+Press `Ctrl+V` to paste an image from your clipboard.
+
+### Supported Platforms
+
+**macOS**
+- Uses `pngpaste` command (if available)
+- Falls back to AppleScript (`osascript`) for PNG extraction
+- Automatically converts clipboard image to PNG format
+
+**Linux**
+- Checks `wl-paste` (Wayland)
+- Falls back to `xclip` (X11)
+- Falls back to `xsel` (X11)
+
+**Windows**
+- Currently not supported for direct clipboard image paste
+- Use file paths instead (see below)
+
+### macOS Clipboard Tools
+
+For best results on macOS, install `pngpaste`:
+
+```bash
+brew install pngpaste
+```
+
+Without `pngpaste`, loaf uses AppleScript which is slower and less reliable.
+
+## File Path Attachments
+
+Paste a file path and press `Ctrl+V` to attach the image:
+
+```
+> /Users/you/screenshots/bug.png
+[Press Ctrl+V]
+```
+
+loaf will:
+1. Resolve the path (supports `~` for home directory)
+2. Validate the file exists and is a supported image type
+3. Check the file size (max 8 MB)
+4. Load and encode the image as a base64 data URL
+5. Attach it to your current message
+
+## Supported Image Formats
+
+| Extension | MIME Type    |
+|-----------|-------------|
+| `.png`    | `image/png` |
+| `.jpg`    | `image/jpeg`|
+| `.jpeg`   | `image/jpeg`|
+| `.webp`   | `image/webp`|
+| `.gif`    | `image/gif` |
+
+Other formats are not supported.
+
+## Image Limits
+
+### File Size
+- **Maximum:** 8 MB per image
+- Larger images will be rejected with an error message
+
+### Attachment Count
+- **Maximum:** 4 images per message
+- After reaching the limit, you must send the message or use `/clear`
+
+```
+> [Image 1] [Image 2] [Image 3] [Image 4]
+[Trying to attach 5th image]
+✗ image limit reached (4). send or /clear first.
+```
+
+## Image Workflow
+
+### 1. Attach Image
+
+Press `Ctrl+V` with an image in clipboard or a file path:
+
+```
+✓ image attached: screenshot.png (image/png, 234 kb)
+> [Image 1] 
+```
+
+### 2. Add Context
+
+Type your prompt after the image placeholder:
+
+```
+> [Image 1] What's wrong with this error message?
+```
+
+### 3. Send Message
+
+Press `Enter` to send. The model receives both the image and text.
+
+### Multiple Images
+
+Attach multiple images before sending:
+
+```
+> [Image 1] [Image 2] Compare these two designs
+```
+
+## Image Display
+
+Images appear in the conversation transcript:
+
+```
+> Fix this UI bug
+  image: screenshot.png (image/png, 234 kb)
+
+⊳ I can see the button is misaligned...
+```
+
+## Technical Details
+
+### Data URL Encoding
+
+Images are converted to base64 data URLs for sending to the model:
+
+```
+data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
+```
+
+This allows images to be:
+- Stored in session history
+- Sent to any model provider
+- Preserved when resuming sessions
+
+### Token Cost
+
+Images consume tokens based on size and resolution. loaf estimates:
+
+- **~850 tokens** per image (approximate)
+- Added to context window calculation
+- Displayed in token budget counter
+
+From `src/index.tsx:293`:
+```typescript
+const APPROX_HISTORY_IMAGE_TOKENS_UI = 850;
+```
+
+### Image Storage
+
+When you attach an image:
+
+```typescript
+type ChatImageAttachment = {
+  path: string;          // Original file path or generated name
+  mimeType: string;      // "image/png", "image/jpeg", etc.
+  dataUrl: string;       // Base64 data URL
+  byteSize: number;      // File size in bytes
+};
+```
+
+Reference: `src/chat-types.ts`
+
+### Path Resolution
+
+loaf resolves image paths with:
+
+- `~/` → User home directory
+- `file://` → Decoded from URI format
+- Relative paths → Resolved from current working directory
+- Quoted paths → Quotes stripped automatically
+
+Implementation: `src/core/images.ts:210-238`
+
+## Keyboard Shortcut
+
+The attach shortcut adapts to your platform:
+
+- **macOS, Linux, Windows:** `Ctrl+V`
+
+Displayed at the bottom of the screen:
+```
+ctrl+v attach image | ctrl+c quit
+```
+
+## Error Messages
+
+### Common Errors
+
+**File not found**
+```
+✗ file not found: /path/to/image.png
+```
+
+**Unsupported format**
+```
+✗ unsupported image type: .bmp. supported: .png, .jpg, .jpeg, .webp, .gif
+```
+
+**File too large**
+```
+✗ image too large (12.5 mb). max is 8 mb
+```
+
+**No clipboard image**
+```
+✗ clipboard has no image (or image path).
+```
+
+**Already attached**
+```
+✗ image already attached: screenshot.png
+```
+
+## RPC Mode
+
+When using loaf in [RPC mode](/usage/rpc-mode), images can be sent via:
+
+### File Path
+```json
+{
+  "path": "/path/to/image.png"
+}
+```
+
+### Data URL
+```json
+{
+  "data_url": "data:image/png;base64,iVBORw0...",
+  "mime_type": "image/png",
+  "path": "optional-name.png"
+}
+```
+
+Reference: `src/core/images.ts:16-55`
+
+## Examples
+
+### Debugging UI Issues
+
+```
+> [Image 1] The button alignment is off. How do I fix this?
+```
+
+### Code Review
+
+```
+> [Image 1] [Image 2] Compare the before and after. Does this look correct?
+```
+
+### Design Feedback
+
+```
+> [Image 1] What improvements would you suggest for this dashboard?
+```
+
+<Note>
+Image attachments work best with vision-capable models like GPT-4o, Claude 3.5 Sonnet, and Gemini Pro Vision.
+</Note>
