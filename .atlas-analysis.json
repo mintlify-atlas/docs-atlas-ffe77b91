@@ -1,0 +1,137 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "loaf",
+  "projectDescription": "A terminal-first AI coding assistant built with Ink + React",
+  "theme": "palm",
+  "primaryColor": "#8B6F47",
+  "lightColor": "#C9A86A",
+  "darkColor": "#5C4A2F",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core/skills",
+              "core/tools",
+              "core/models",
+              "core/authentication"
+            ]
+          },
+          {
+            "group": "Usage",
+            "pages": [
+              "usage/commands",
+              "usage/chat-history",
+              "usage/image-attachments",
+              "usage/rpc-mode"
+            ]
+          },
+          {
+            "group": "Customization",
+            "pages": [
+              "customization/custom-tools",
+              "customization/creating-skills"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Tool Reference",
+        "groups": [
+          {
+            "group": "Built-in Tools",
+            "pages": [
+              "tools/bash",
+              "tools/file-operations",
+              "tools/javascript",
+              "tools/web-search"
+            ]
+          },
+          {
+            "group": "Tool Development",
+            "pages": [
+              "tools/custom-tool-api",
+              "tools/tool-runtime"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "RPC API",
+        "groups": [
+          {
+            "group": "Protocol",
+            "pages": [
+              "rpc/overview",
+              "rpc/authentication",
+              "rpc/handshake"
+            ]
+          },
+          {
+            "group": "Methods",
+            "pages": [
+              "rpc/methods/system",
+              "rpc/methods/session",
+              "rpc/methods/auth",
+              "rpc/methods/model"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "rpc/events/overview",
+              "rpc/events/session-events",
+              "rpc/events/auth-events"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Terminal-first UI with Ink + React",
+    "Multi-provider model support (OpenAI, OpenRouter, Antigravity)",
+    "Extensible tool system with built-in bash, file, and JS execution",
+    "Skills system for repeatable instruction bundles",
+    "Background process management for async shell and JS execution",
+    "JSON-RPC 2.0 stdio server mode for programmatic integration",
+    "Chat history and session resumption",
+    "Image attachment support via clipboard",
+    "Custom tool authoring in JavaScript"
+  ],
+  "publicApiSurface": [
+    "loaf (TUI mode)",
+    "loaf rpc (JSON-RPC stdio server)",
+    "/auth - Provider authentication",
+    "/model - Model selection",
+    "/skills - List skills",
+    "/tools - List tools",
+    "/history - Session management",
+    "rpc.handshake",
+    "session.create",
+    "session.send",
+    "command.execute",
+    "auth.connect.openai",
+    "auth.set.openrouter_key",
+    "model.list",
+    "model.select",
+    "tools.list",
+    "skills.list",
+    "bash tool",
+    "read_file tool",
+    "run_js tool",
+    "search_web tool",
+    "create_persistent_tool"
+  ]
+}
